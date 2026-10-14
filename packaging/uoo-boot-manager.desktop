@@ -9,3 +9,4 @@ Terminal=false
 Categories=System;
 Keywords=boot;grub;uefi;firmware;
 StartupNotify=false
+StartupWMClass=org.uoo.BootManager

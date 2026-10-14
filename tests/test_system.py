@@ -18,7 +18,9 @@ class SystemTests(unittest.TestCase):
         self.paths = Paths(defaults=root / "grub", dropins=root / "grub.d",
                            config=root / "grub.cfg", state=root / "state", efi=root / "efi",
                            update=root / "update-grub", efibootmgr=root / "efibootmgr",
-                           script_check=root / "grub-script-check")
+                           script_check=root / "grub-script-check", scripts=root / "scripts",
+                           lsblk=root / "missing-lsblk", findmnt=root / "missing-findmnt",
+                           editenv=root / "missing-editenv", grub_install=root / "missing-grub-install")
         self.paths.defaults.write_text('GRUB_DEFAULT=0\nGRUB_TIMEOUT=5\nGRUB_CMDLINE_LINUX="quiet splash"\n')
         self.paths.config.write_text(DEMO_CONFIG)
         self.paths.config.chmod(0o600)
@@ -26,6 +28,7 @@ class SystemTests(unittest.TestCase):
         self.paths.efi.mkdir()
         self.paths.update.touch()
         self.paths.efibootmgr.touch()
+        self.paths.script_check.touch()
         self.firmware = {"order": ["0000", "0001"], "next": "", "entries": ["0000", "0001"]}
         self.calls = []
         self.update_failure = False
@@ -45,7 +48,7 @@ class SystemTests(unittest.TestCase):
         if args[0] == self.paths.script_check:
             return ""
         if args[0] == self.paths.efibootmgr:
-            if len(args) > 1:
+            if len(args) > 1 and args[1] != "--verbose":
                 if args[1] == "--bootorder":
                     self.firmware["order"] = args[2].split(",")
                 elif args[1] == "--delete-bootorder":
@@ -74,7 +77,7 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(data["settings"]["GRUB_TIMEOUT"], "5")
         self.assertFalse(self.paths.state.exists())
         self.assertFalse(self.paths.override.exists())
-        self.assertTrue(all(call == [str(self.paths.efibootmgr)] for call in self.calls))
+        self.assertTrue(all(call == [str(self.paths.efibootmgr), "--verbose"] for call in self.calls))
 
     def test_demo_has_no_system_side_effects(self):
         state = demo_snapshot()
@@ -92,7 +95,7 @@ class SystemTests(unittest.TestCase):
         self.assertEqual(result["snapshot"]["settings"]["GRUB_TIMEOUT"], "8")
         backup = next((self.paths.state / "backups").glob("*.json"))
         self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
-        self.assertIsNone(json.loads(backup.read_text())["data"]["override"])
+        self.assertIsNone(self.manager.store.read_backup(backup.stem)["data"]["files"]["override"]["data"])
 
     def test_update_failure_restores_both_files_and_permissions(self):
         self.paths.override.write_text("GRUB_TIMEOUT=22\n")
@@ -136,7 +139,7 @@ class SystemTests(unittest.TestCase):
         target = self.paths.state.parent / "target"
         target.write_text("unchanged")
         self.paths.override.symlink_to(target)
-        with self.assertRaisesRegex(RuntimeError, "Symbolic links"):
+        with self.assertRaisesRegex(RuntimeError, "Symbolic links|regular file"):
             self.apply()
         self.assertEqual(target.read_text(), "unchanged")
 
@@ -159,8 +162,8 @@ class SystemTests(unittest.TestCase):
     def test_reorder_keeps_all_current_entries(self):
         result = self.manager.dispatch({"action": "apply_order", "order": ["0001", "0000"]})
         self.assertEqual(result["snapshot"]["firmware"]["order"], ["0001", "0000"])
-        self.assertEqual(result["backups"][0]["kind"], "uefi")
-        for order in (["0000"], ["0000", "0000"], ["0001", "FFFF"], ["0001", "0000", "0002"]):
+        self.assertEqual(result["backups"][0]["kind"], "uefi_order")
+        for order in (["0001"], ["0000", "0000"], ["0001", "FFFF"], ["0001", "0000", "0002"]):
             with self.subTest(order=order), self.assertRaises(ValueError):
                 self.manager.dispatch({"action": "apply_order", "order": order})
 
@@ -184,7 +187,7 @@ class SystemTests(unittest.TestCase):
         self.manager.dispatch({"action": "restore", "backup": backup})
         self.assertEqual(self.firmware["next"], "0000")
         result = self.manager.dispatch({"action": "apply_order", "order": ["0001", "0000"]})
-        backup = next(item["id"] for item in result["backups"] if item["kind"] == "uefi")
+        backup = next(item["id"] for item in result["backups"] if item["kind"] == "uefi_order")
         self.firmware["next"] = ""
         self.manager.dispatch({"action": "restore", "backup": backup})
         self.assertEqual(self.firmware["next"], "")

@@ -4,7 +4,7 @@ Validation dates: 14–15 October 2026. Supported system management: Ubuntu 24.0
 
 ## Release evidence
 
-The UEFI, enforced Secure Boot, and BIOS integration gates have passed in independent disposable Ubuntu virtual machines. Final source/package checks and a repeat against the final runtime are being recorded before release.
+The final frozen runtime passed the UEFI, enforced Secure Boot, and BIOS integration gates in independent disposable Ubuntu virtual machines. The source suite, native desktop checks, and Debian archive checks also passed. All requirements in `PRODUCTION.md` are satisfied within the stated platform and storage limits.
 
 The final source test suite passed **275 tests with no skips**, including **21 native GTK interaction tests**, **51 production transaction tests**, and **28 repair tests**. The native source launcher passed `--help` and an eight-second demo startup. The Debian archive checker passed **27 source-matching files**, root ownership, and protected permissions. Python 3.10 syntax compatibility was checked for all 23 application/helper/build-script Python files; the app also ran on Python 3.12 in the Ubuntu 24.04 guests and Python 3.14 on the development desktop.
 
@@ -29,11 +29,15 @@ All three guests ran Ubuntu 24.04.5 LTS, kernel `6.8.0-142-generic`, Python 3.12
 
 | Guest | Installed-helper operations before reboot | Actual boot result |
 | --- | ---: | --- |
-| UEFI | 54 | SSH returned; firmware `BootNext` and GRUB `next_entry` were consumed; `uoo_vm_check=1` appeared in the running kernel command line |
-| Enforced Secure Boot | 54 | Signed EFI repair and actual boot succeeded; one-time choices were consumed; kernel marker verified; Secure Boot remained enabled after boot |
-| BIOS | 34 | Reinstallation on the verified disposable `/dev/vda` succeeded; custom Linux one-time entry booted with `uoo_vm_custom=1`; GRUB one-time choice was consumed |
+| UEFI | 53 | SSH returned; firmware `BootNext` and GRUB `next_entry` were consumed; `uoo_vm_check=1` appeared in the running kernel command line |
+| Enforced Secure Boot | 53 | Signed EFI repair and actual boot succeeded; one-time choices were consumed; kernel marker verified; Secure Boot remained enabled after boot |
+| BIOS | 33 | Reinstallation on the verified disposable `/dev/vda` succeeded; custom Linux one-time entry booted with `uoo_vm_custom=1`; GRUB one-time choice was consumed |
 
 Each guest's original baseline was restored after the checks. This includes GRUB settings, managed entries, images, environment selections, and firmware state where applicable. Tests never use the development machine's disks as QEMU storage and never change its boot configuration.
+
+These are the final repeat-run counts; earlier runs also passed 54, 54, and 34 operations respectively, including first-time baseline creation. The final repeat reused those immutable baseline backups. Documentation and the installer checksum were finalized after these boot tests; the executable runtime fingerprint remained unchanged.
+
+All three guests matched every one of the 20 frozen runtime files after testing. Their tested installer SHA256 was `b1221ac5bda77002ca861d0538c7a242fe7a0e29a95f03aafb92e477403c5baf`; the delivered archive includes the finalized documentation, with identical runtime bytes and its own verified checksum in `dist/SHA256SUMS`.
 
 Local detailed evidence is retained in `/tmp/uoo-vm-live/`, `/tmp/uoo-vm-secure/`, and `/tmp/uoo-vm-bios/`: `integration-before.log`, `integration-after.log`, `serial.log`, and `vm.json`. These temporary files are session evidence; the runner can reproduce them on another machine.
 
@@ -60,4 +64,6 @@ The evidence covers disposable Ubuntu guests and simulated failure paths. It doe
 
 External Btrfs GRUB environment behavior, failure injection, corrupt backup metadata, and cancelled authentication were exercised with simulations. Real system-generated administrator password prompts and screen-reader operation were not manually audited. The installed polkit policy, fixed helper path, privileged ownership checks, and real helper operations were verified in the guests.
 
-The RPM desktop targets Fedora and the AppImage provides the unprivileged desktop; Ubuntu remains the supported boot-management backend. Real AppImage changes require the matching system package helper. CI packaging availability does not imply that every job has run in this local session; format-specific validation is recorded when performed.
+The delivered release artifact is the verified Ubuntu `.deb`, with its checksum in `dist/SHA256SUMS`. The repository includes optional RPM and AppImage build workflows; those formats were not rebuilt for this final release. Earlier portable artifacts were preserved under `build/previous-artifacts/` and are excluded from delivery. The earlier AppImage used newer host libraries and did not satisfy the Ubuntu 24.04 compatibility baseline.
+
+Ubuntu remains the supported boot-management backend. An optional AppImage requires the matching installed system package helper for real changes. Hosted GitHub Actions and Fedora/clean-container runs were not executed in this local session; the workflow and reproducible instructions are provided without claiming those executions.

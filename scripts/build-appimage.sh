@@ -8,7 +8,7 @@ appimagetool="${APPIMAGETOOL:?Set APPIMAGETOOL to the downloaded appimagetool ex
 runtime_file="${APPIMAGETOOL_RUNTIME_FILE:?Set APPIMAGETOOL_RUNTIME_FILE to the pinned AppImage runtime}"
 architecture="$(uname -m)"
 case "$architecture" in x86_64|aarch64) ;; *) printf 'Unsupported AppImage architecture: %s\n' "$architecture" >&2; exit 1 ;; esac
-"$build_python" -c 'import gi; gi.require_version("Gtk", "4.0"); gi.require_version("Adw", "1"); from gi.repository import Gtk, Adw; assert Adw.get_major_version() > 1 or Adw.get_minor_version() >= 5'
+"$build_python" -c 'import gi; gi.require_version("Gtk", "4.0"); gi.require_version("Adw", "1"); gi.require_foreign("cairo"); from gi.repository import Gtk, Adw; assert Adw.get_major_version() > 1 or Adw.get_minor_version() >= 5'
 
 mkdir -p "$project_root/build" "$project_root/dist"
 stage="$(mktemp -d "$project_root/build/appimage.XXXXXX")"

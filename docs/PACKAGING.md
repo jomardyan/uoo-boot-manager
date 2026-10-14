@@ -19,6 +19,14 @@ policy. The AppImage never elevates bundled code or installs its own helper.
 Use the `.deb` for supported Ubuntu system management. The workflow includes an
 AppImage startup test in an Ubuntu 24.04 container without GTK4 or PyGObject installed.
 
+The AppImage uses the host graphics stack: OpenGL/EGL and the Wayland client,
+cursor, and EGL libraries. PyInstaller deliberately excludes these libraries
+to avoid conflicts with the target machine's graphics drivers. The clean test
+container installs `libgl1`, `libegl1`, `libwayland-client0`,
+`libwayland-cursor0`, and `libwayland-egl1`, while GTK4, libadwaita, and
+PyGObject must come from the bundle. The build also requires `python3-gi-cairo`
+for PyGObject's Cairo conversion binding and checks it before packaging.
+
 ## Download a build
 
 Open **Actions → Build Linux packages → a successful run → Artifacts** and
@@ -69,7 +77,7 @@ validation requirements remain documented in `PRODUCTION.md`.
 ## Build locally on Ubuntu
 
 ```sh
-sudo apt install dpkg-dev rpm python3-venv python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+sudo apt install dpkg-dev rpm python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
   binutils patchelf squashfs-tools desktop-file-utils
 bash scripts/build-deb.sh
 python3 scripts/check-package.py dist/uoo-boot-manager_*_all.deb

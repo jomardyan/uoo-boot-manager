@@ -10,6 +10,14 @@ import subprocess
 
 
 SOURCE = Path(__file__).resolve().parents[1]
+REQUIRED_RUNTIME_DEPENDENCIES = {
+    "python3 >= 3.10",
+    "python3-gobject",
+    "gobject-introspection",
+    "gtk4 >= 4.6",
+    "libadwaita >= 1.5",
+    "polkit",
+}
 spec = importlib.util.spec_from_file_location("deb_check", SOURCE / "scripts/check-package.py")
 deb_check = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(deb_check)
@@ -27,6 +35,10 @@ def check_package(package):
         raise ValueError("RPM must not contain installation/removal scriptlets or triggers")
     if query(package, "--qf", "%{NAME} %{ARCH} %{FILEDIGESTALGO}") != "uoo-boot-manager noarch 8":
         raise ValueError("Unexpected RPM name, architecture, or file digest algorithm")
+    requirements = {" ".join(line.split()) for line in query(package, "--requires").splitlines()}
+    missing = REQUIRED_RUNTIME_DEPENDENCIES - requirements
+    if missing:
+        raise ValueError("Missing RPM runtime dependencies: " + ", ".join(sorted(missing)))
     expected = deb_check.expected_files(SOURCE)
     directories = {str(parent) for name in expected for parent in Path(name).parents}
     found = set()
@@ -60,4 +72,4 @@ if __name__ == "__main__":
         count = check_package(args.package)
     except (ValueError, OSError, subprocess.CalledProcessError) as exc:
         parser.exit(1, f"RPM check failed: {exc}\n")
-    print(f"RPM verified: {count} source-matching files, root ownership, safe permissions, no scriptlets")
+    print(f"RPM verified: {count} source-matching files, runtime dependencies, root ownership, safe permissions, no scriptlets")

@@ -12,6 +12,8 @@ Source0: payload.tar.gz
 AutoReqProv: no
 Requires: python3 >= 3.10
 Requires: python3-gobject
+# Fedora packages cairo-1.0.typelib separately from the Python GI bindings.
+Requires: gobject-introspection
 Requires: gtk4 >= 4.6
 Requires: libadwaita >= 1.5
 Requires: polkit

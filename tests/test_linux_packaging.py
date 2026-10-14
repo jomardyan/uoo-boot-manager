@@ -18,7 +18,7 @@ spec.loader.exec_module(rpm_check)
 
 
 class RpmValidationTests(unittest.TestCase):
-    def validate(self, alter=None, scripts="", triggers=""):
+    def validate(self, alter=None, scripts="", triggers="", requirements=None):
         rows = []
         for name, (source, mode) in rpm_check.deb_check.expected_files(SOURCE).items():
             row = ["/" + name, str(0o100000 | mode), "root", "root",
@@ -26,7 +26,10 @@ class RpmValidationTests(unittest.TestCase):
             if alter and name == "usr/lib/uoo-boot-manager/helper.py":
                 alter(row)
             rows.append("\t".join(row))
-        outputs = [scripts, triggers, "uoo-boot-manager noarch 8", "\n".join(rows)]
+        if requirements is None:
+            requirements = "\n".join(("python3 >= 3.10", "python3-gobject", "gobject-introspection",
+                                      "gtk4 >= 4.6", "libadwaita >= 1.5", "polkit"))
+        outputs = [scripts, triggers, "uoo-boot-manager noarch 8", requirements, "\n".join(rows)]
         with patch.object(rpm_check, "query", side_effect=outputs), patch.object(rpm_check.subprocess, "run"):
             return rpm_check.check_package(Path("payload.rpm"))
 
@@ -53,6 +56,19 @@ class RpmValidationTests(unittest.TestCase):
         for fields in ({"scripts": "postinstall script"}, {"triggers": "package trigger"}):
             with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, "scriptlets or triggers"):
                 self.validate(**fields)
+
+    def test_rejects_missing_cairo_typelib_runtime_dependency(self):
+        requirements = "\n".join(("python3 >= 3.10", "python3-gobject", "gtk4 >= 4.6",
+                                  "libadwaita >= 1.5", "polkit"))
+        with self.assertRaisesRegex(ValueError, "Missing RPM runtime dependencies: gobject-introspection"):
+            self.validate(requirements=requirements)
+
+    def test_rejects_missing_python_or_gtk_runtime_dependency(self):
+        requirements = ("python3 >= 3.10", "python3-gobject", "gobject-introspection",
+                        "gtk4 >= 4.6", "libadwaita >= 1.5", "polkit")
+        for omitted in ("python3 >= 3.10", "gtk4 >= 4.6", "libadwaita >= 1.5"):
+            with self.subTest(omitted=omitted), self.assertRaisesRegex(ValueError, "Missing RPM runtime dependencies"):
+                self.validate(requirements="\n".join(item for item in requirements if item != omitted))
 
     def test_rejects_failed_payload_integrity_check(self):
         with patch.object(rpm_check.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "rpmkeys")):

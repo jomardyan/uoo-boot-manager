@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+PackageIdentifier: "HaykJomardyan.UooBootManager"
+PackageVersion: "2.2.0"
+PackageLocale: "en-US"
+Publisher: "Hayk Jomardyan"
+PublisherUrl: "https://github.com/jomardyan"
+PublisherSupportUrl: "https://github.com/jomardyan/uoo-boot-manager/issues"
+PackageName: "Uoo Boot Manager"
+PackageUrl: "https://github.com/jomardyan/uoo-boot-manager"
+License: "MIT"
+LicenseUrl: "https://github.com/jomardyan/uoo-boot-manager/blob/v2.2.0/LICENSE"
+ShortDescription: "Native boot configuration and recovery for Windows 11."
+Description: "Manage Windows Boot Manager, UEFI entries, and configuration backups from a native desktop. System changes use a separately authenticated administrator helper."
+Tags:
+  - "boot"
+  - "boot-manager"
+  - "bcd"
+  - "uefi"
+  - "recovery"
+ReleaseNotesUrl: "https://github.com/jomardyan/uoo-boot-manager/releases/tag/v2.2.0"
+ManifestType: "defaultLocale"
+ManifestVersion: "1.12.0"

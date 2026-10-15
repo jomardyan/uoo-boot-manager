@@ -73,6 +73,7 @@ TARGETS = {
     "vm-test": ("deb", "vm"),
     "icons": ("icons",),
     "website": ("website",),
+    "winget": (),
 }
 FORMATS = ("deb", "rpm", "rpm-opensuse", "arch", "appimage", "flatpak", "snap")
 APPIMAGE_HASHES = {

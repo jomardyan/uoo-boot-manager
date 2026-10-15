@@ -1,0 +1,84 @@
+name: Validate WinGet package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/winget/**'
+      - 'scripts/build-winget.py'
+      - '.github/workflows/winget.yml'
+  pull_request:
+    paths:
+      - 'packaging/winget/**'
+      - 'scripts/build-winget.py'
+      - '.github/workflows/winget.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: WinGet ${{ matrix.arch }} install and uninstall
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Prepare Microsoft WinGet client
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
+            Install-Module Microsoft.WinGet.Client -Repository PSGallery -Force -Scope CurrentUser
+            Import-Module Microsoft.WinGet.Client
+            Repair-WinGetPackageManager -AllUsers
+          }
+          $command = Get-Command winget -ErrorAction SilentlyContinue
+          if ($command) {
+            $client = $command.Source
+          } else {
+            $package = Get-AppxPackage Microsoft.DesktopAppInstaller | Select-Object -First 1
+            $client = Join-Path $package.InstallLocation 'winget.exe'
+          }
+          if (!(Test-Path $client)) { throw 'Microsoft WinGet client is unavailable.' }
+          "UOO_WINGET=$client" >> $env:GITHUB_ENV
+          & $client --version
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet did not start.' }
+      - name: Validate and install the published native installer
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = ([xml](Get-Content windows/Directory.Build.props -Raw)).Project.PropertyGroup.Version
+          $manifest = ".\packaging\winget\manifests\h\HaykJomardyan\UooBootManager\$version"
+          & $env:UOO_WINGET validate --manifest $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest validation failed.' }
+          & $env:UOO_WINGET settings --enable LocalManifestFiles
+          if ($LASTEXITCODE -ne 0) { throw 'Could not enable local manifests.' }
+          & $env:UOO_WINGET install --manifest $manifest --architecture '${{ matrix.arch }}' --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet installation failed.' }
+          $registration = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1'
+          if ($registration.DisplayVersion -ne $version) { throw 'Installed version differs from the manifest.' }
+          foreach ($file in @('Uoo.BootManager.exe', 'Uoo.BootHelper.exe')) {
+            if (!(Test-Path (Join-Path $env:ProgramFiles "Uoo Boot Manager\$file"))) { throw "Missing installed $file" }
+          }
+      - name: Uninstall with WinGet
+        run: |
+          & $env:UOO_WINGET uninstall --name 'Uoo Boot Manager' --exact --silent --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
+          if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootManager.exe')) { throw 'The desktop remains after uninstall.' }
+          if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootHelper.exe')) { throw 'The helper remains after uninstall.' }
+      - name: Disable local manifest support
+        if: always()
+        run: |
+          if ($env:UOO_WINGET) { & $env:UOO_WINGET settings --disable LocalManifestFiles }

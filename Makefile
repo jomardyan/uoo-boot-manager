@@ -10,6 +10,7 @@ PYTHON ?= python3
 DOTNET ?= dotnet
 POWERSHELL ?= pwsh
 NODE ?= node
+WINGET_VERSION ?= $(shell "$(PYTHON)" scripts/package-version.py)
 WINDOWS_RUNTIME ?= win-x64
 WINDOWS_BUILD_ARGS ?=
 # Select formats appropriate to your build host, e.g. PACKAGE_FORMATS="deb rpm".
@@ -23,7 +24,7 @@ DEPS_FOR ?= everything
 DEPS_ARGS ?=
 DEPENDENCY_TARGETS := help all build deb rpm rpm-opensuse arch appimage flatpak snap \
 	packages version test test-gtk smoke demo check check-package checksums \
-	verify-checksums windows windows-test vm-test icons website clean distclean
+	verify-checksums windows windows-test vm-test icons website winget clean distclean
 # These defaults match deps-appimage; environment/command-line overrides win.
 BUILD_PYTHON ?= $(CURDIR)/build/appimage-venv/bin/python
 APPIMAGETOOL ?= $(CURDIR)/build/tools/appimagetool.AppImage
@@ -52,7 +53,7 @@ endef
 
 .PHONY: help all build deb rpm rpm-opensuse arch appimage flatpak snap packages \
 	version test test-gtk smoke demo check check-package checksums verify-checksums \
-	windows windows-test vm-test icons website clean distclean
+	windows windows-test vm-test icons website winget clean distclean
 .PHONY: deps install-deps deps-all $(addprefix deps-,$(DEPENDENCY_TARGETS))
 
 help:
@@ -73,6 +74,7 @@ help:
 	  "$${uoo_cyan}  make demo$${uoo_reset}         Start the interactive source demo" \
 	  "$${uoo_cyan}  make icons$${uoo_reset}        Regenerate platform icons and favicons from SVG masters" \
 	  "$${uoo_cyan}  make website$${uoo_reset}      Build and check the static landing page for your hosting" \
+	  "$${uoo_cyan}  make winget$${uoo_reset}       Prepare manifests from verified published Windows installers" \
 	  "$${uoo_cyan}  make version$${uoo_reset}      Validate and print the Linux release version" \
 	  "$${uoo_cyan}  make check-package$${uoo_reset} Build and validate the Debian archive" \
 	  "$${uoo_cyan}  make rpm$${uoo_reset}          Build and validate the Fedora RPM from Debian" \
@@ -120,6 +122,10 @@ website:
 	"$(NODE)" website/build.mjs
 	"$(NODE)" --check website/app.js
 	"$(PYTHON)" scripts/check-website.py
+
+winget:
+	$(task_status)
+	"$(PYTHON)" scripts/build-winget.py --version "$(WINGET_VERSION)"
 
 deb:
 	$(task_status)

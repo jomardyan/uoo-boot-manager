@@ -15,6 +15,10 @@ Boot Manager** from Start. The installer includes the .NET runtime. Windows 11
 build 22000 or later is required. The current packages are unsigned; no signing
 certificate is configured for this project.
 
+WinGet manifests are prepared for both architectures. The community catalog
+listing is pending; see the [WinGet guide](WINGET.md) for local installation,
+validation, and publication instructions.
+
 Installation puts the desktop and administrator helper in the protected
 `C:\Program Files\Uoo Boot Manager` directory. Installation and uninstallation
 do not change BCD, firmware settings, or boot files. Removing the app preserves

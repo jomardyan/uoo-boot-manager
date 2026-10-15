@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: "HaykJomardyan.UooBootManager"
+PackageVersion: "2.2.0"
+InstallerLocale: "en-US"
+MinimumOSVersion: "10.0.22000.0"
+InstallerType: "inno"
+Scope: "machine"
+UpgradeBehavior: "install"
+ProductCode: "{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1"
+ElevationRequirement: "elevationRequired"
+Installers:
+  - Architecture: "x64"
+    InstallerUrl: "https://github.com/jomardyan/uoo-boot-manager/releases/download/v2.2.0/Uoo-Boot-Manager-2.2.0-windows-x64-setup.exe"
+    InstallerSha256: "5618B6E0BDCB50291A7C6379F38F8D95A29B54A44087AB2A00DCE97A7817BB92"
+  - Architecture: "arm64"
+    InstallerUrl: "https://github.com/jomardyan/uoo-boot-manager/releases/download/v2.2.0/Uoo-Boot-Manager-2.2.0-windows-arm64-setup.exe"
+    InstallerSha256: "D1EFC8521B6BC29E6C7AE011E1956C3983C55286E962D35E6B1C785B44C49B0D"
+ManifestType: "installer"
+ManifestVersion: "1.12.0"

@@ -130,6 +130,18 @@ Download the **windows-x64-setup.exe** package for Intel/AMD PCs or
 Windows 11 build 22000 or later is required. Current Windows packages are
 unsigned.
 
+**WinGet:** manifests for x64 and ARM64 are prepared under
+[`packaging/winget`](packaging/winget/manifests/h/HaykJomardyan/UooBootManager/2.2.0).
+The proposed package ID is `HaykJomardyan.UooBootManager`; it is **not yet
+published in the community catalog**. After acceptance, install with:
+
+```powershell
+winget install --id HaykJomardyan.UooBootManager --exact --source winget
+```
+
+For installation with the local manifests now, validation, and submission,
+follow the [WinGet publishing guide](docs/WINGET.md).
+
 The ZIP supports demo mode and available read-only inspection. Install the
 application before using administrator actions. See the [Windows guide](docs/WINDOWS.md)
 for UAC, BitLocker handling, recovery, and repair requirements.
@@ -286,6 +298,7 @@ uploading to your own hosting.
 | [Ubuntu publishing](docs/PUBLISHING.md) | Launchpad PPA/APT uploads, Snap Store releases, and Ubuntu App Center listings |
 | [Microsoft Store publishing](docs/WINDOWS-STORE.md) | Signing, silent installers, Partner Center submission, and Windows Store updates |
 | [Windows 11](docs/WINDOWS.md) | Installation, BCD and UEFI features, builds, tests, and platform limits |
+| [WinGet publishing](docs/WINGET.md) | Prepare, test, and submit the Windows package manifests |
 | [Production requirements](docs/PRODUCTION.md) | Supported operations and verification gates |
 | [Validation report](docs/VALIDATION.md) | Recorded test evidence and remaining limits |
 

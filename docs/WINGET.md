@@ -5,6 +5,24 @@ target **2.2.0**, Windows 11 build 22000+, and native **x64 / ARM64** installers
 The package is **not yet published in the WinGet community catalog**. Preparing
 these files or publishing a GitHub release does not submit it to Microsoft.
 
+## Current validation status
+
+The manifests and installer hashes are prepared. Native ARM64 WinGet validation,
+silent installation, installed registration, and uninstall passed in
+[run 38816463994](https://github.com/jomardyan/uoo-boot-manager/actions/runs/38816463994).
+On the x64 runner, schema validation and download/hash verification pass, but
+WinGet stalls while launching the installer, before an Inno Setup log appears.
+The workflow fails this check and prints its diagnostics; it does not treat a
+direct installer control test as a successful WinGet installation.
+
+**Publication is pending the x64 installation check.** Reproduce the commands
+below on a clean Windows 11 x64 system before submitting. A similar launch hang
+is tracked in [Microsoft's WinGet issue 6506](https://github.com/microsoft/winget-cli/issues/6506);
+the matching symptoms do not establish the same cause. Retain the WinGet and
+installer logs when investigating. The current installer URLs and hashes must
+remain unchanged; if a binary fix or signing changes their bytes, publish a new
+app version and generate manifests for that release.
+
 ## Prepare a release
 
 The installers use Inno Setup, require machine-wide administrator installation,

@@ -87,7 +87,7 @@ jobs:
           }
       - name: Uninstall with WinGet
         run: |
-          & $env:UOO_WINGET uninstall --name 'Uoo Boot Manager' --exact --silent --disable-interactivity
+          & $env:UOO_WINGET uninstall --name 'Uoo Boot Manager' --exact --silent --accept-source-agreements --disable-interactivity
           if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootManager.exe')) { throw 'The desktop remains after uninstall.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootHelper.exe')) { throw 'The helper remains after uninstall.' }

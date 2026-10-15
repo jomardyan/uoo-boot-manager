@@ -39,8 +39,7 @@ jobs:
             exit 1
           fi
           tag="v$version"
-          existing="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
-          if [[ -n "$existing" ]]; then
+          if existing="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>/dev/null)"; then
             if [[ "$existing" != "$GITHUB_SHA" ]]; then
               printf 'Refusing to move existing tag %s to another commit.\n' "$tag" >&2
               exit 1

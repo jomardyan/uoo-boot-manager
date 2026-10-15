@@ -77,6 +77,7 @@ jobs:
           New-Item -ItemType Directory -Path $settings -Force | Out-Null
           '{"network":{"downloader":"wininet"}}' | Set-Content (Join-Path $settings 'settings.json') -Encoding utf8
       - name: Validate and install the published native installer
+        timeout-minutes: 3
         run: |
           $ErrorActionPreference = 'Stop'
           $version = ([xml](Get-Content windows/Directory.Build.props -Raw)).Project.PropertyGroup.Version
@@ -94,11 +95,22 @@ jobs:
             if (!(Test-Path (Join-Path $env:ProgramFiles "Uoo Boot Manager\$file"))) { throw "Missing installed $file" }
           }
       - name: Uninstall with WinGet
+        timeout-minutes: 3
         run: |
           & $env:UOO_WINGET uninstall --product-code '{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1' --silent --accept-source-agreements --disable-interactivity
           if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootManager.exe')) { throw 'The desktop remains after uninstall.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootHelper.exe')) { throw 'The helper remains after uninstall.' }
+      - name: Print WinGet diagnostics after a failure
+        if: failure()
+        run: |
+          $logs = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'
+          if (Test-Path $logs) {
+            Get-ChildItem $logs -Filter '*.log' | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {
+              Write-Host "WinGet diagnostic file: $($_.Name)"
+              Get-Content $_.FullName -Tail 100
+            }
+          }
       - name: Disable local manifest support
         if: always()
         run: |

@@ -45,7 +45,7 @@ class Firmware:
         if not set(order) <= set(known):
             raise ValueError("A UEFI entry is no longer present. Reload before applying changes.")
         current = firmware.get("current")
-        if current and current in known and current not in order:
+        if current and current in firmware["order"] and current not in order:
             raise ValueError("The currently booted firmware entry must remain in the boot order.")
         if not any(known[entry]["active"] for entry in order):
             raise ValueError("At least one active entry must remain in the boot order.")
@@ -54,7 +54,8 @@ class Firmware:
 
     def creation_spec(self, entry):
         path = entry.get("device_path", "")
-        match = re.search(r"HD\((\d+),GPT,([0-9a-fA-F-]+),[^)]*\).*?File\(([^)]+)\)", path)
+        # efibootmgr 17 prints File(\EFI\...efi); 18+ prints the bare path, then any optional data as hex.
+        match = re.search(r"HD\((\d+),GPT,([0-9a-fA-F-]+),[^)]*\)/(?:File\()?(\\[^)\t]*?\.efi)(?=\)|/|$|[0-9a-f])", path, re.I)
         if not match:
             raise ValueError("This firmware entry has no restorable local EFI loader path; deletion is disabled.")
         inventory = facts.devices(self.paths, self.runner)
@@ -68,7 +69,8 @@ class Firmware:
                 "loader": loader, "active": bool(entry["active"])}
 
     def check_loader(self, label, disk, partition, loader):
-        if not isinstance(label, str) or not label.strip() or len(label) > 120 or any(ord(c) < 32 for c in label):
+        if (not isinstance(label, str) or not label.strip() or label != label.strip() or len(label) > 120
+                or any(ord(c) < 32 for c in label)):
             raise ValueError("Use a nonempty firmware label of at most 120 characters.")
         if not isinstance(disk, str) or not re.fullmatch(r"/dev/[A-Za-z0-9_.+-]+", disk):
             raise ValueError("Select a whole disk from the device list.")
@@ -131,6 +133,11 @@ class Firmware:
                 self.check_entry_identity(known[entry], spec=spec)
             else:
                 self.check_loader(spec["label"], spec["disk"], spec["partition"], spec["loader"])
+        if target.get("next"):
+            # next_boot refuses inactive entries; a restore must not bypass that rule.
+            restored = {item["id"]: item["active"] for item in target.get("entries", [])}
+            if not restored.get(target["next"], known.get(target["next"], {}).get("active", False)):
+                raise ValueError("A backup cannot schedule an inactive firmware entry for the next boot.")
         for entry in target.get("remove", []):
             identifier(entry)
             if entry in (current["current"], current["next"]):
@@ -211,8 +218,11 @@ class Firmware:
             entry = target["next"]
             if entry:
                 identifier(entry)
-                if entry not in {item["id"] for item in self.firmware()["entries"]}:
+                selected = next((item for item in self.firmware()["entries"] if item["id"] == entry), None)
+                if selected is None:
                     raise ValueError("The backup's one-time firmware entry no longer exists.")
+                if not selected["active"]:
+                    raise ValueError("A backup cannot schedule an inactive firmware entry for the next boot.")
             if self.firmware()["next"] != entry:
                 self.runner([self.paths.efibootmgr, *( ["--bootnext", entry] if entry else ["--delete-bootnext"] )], timeout=15)
         verified = self.firmware()

@@ -2,9 +2,12 @@
 
 import os
 from pathlib import Path
+import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
+from uoo import platform as facts
 from uoo.core import DEMO_CONFIG
 from uoo.system import Manager, Paths, demo_snapshot, snapshot
 
@@ -226,6 +229,37 @@ class SystemTests(unittest.TestCase):
         result = snapshot(self.paths, self.runner)
         self.assertFalse(result["firmware"]["available"])
         self.assertEqual(self.calls, [])
+
+
+
+class PlatformTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        root = Path(self.temp.name)
+        self.paths = Paths(defaults=root / "grub", config=root / "grub.cfg", state=root / "state", efi=root / "efi",
+                           update=root / "update-grub", efibootmgr=root / "efibootmgr", lsblk=root / "lsblk",
+                           findmnt=root / "findmnt", editenv=root / "editenv", grub_install=root / "grub-install")
+        self.paths.lsblk.touch()
+
+    def test_mbr_efi_system_partition_is_recognised(self):
+        nodes = {"blockdevices": [{"path": "/dev/sda", "type": "disk", "children": [
+            {"path": "/dev/sda1", "type": "part", "pkname": "/dev/sda", "partn": 1, "parttype": "0xef"},
+            {"path": "/dev/sda2", "type": "part", "pkname": "/dev/sda", "partn": 2, "parttype": "0x83"}]}]}
+        inventory = facts.devices(self.paths, lambda args, timeout=0: json.dumps(nodes))
+        self.assertEqual([node["esp"] for node in inventory], [False, True, False])
+
+    def test_unreadable_state_directory_reports_unknown_pending_recovery(self):
+        exists = Path.exists
+        def denied(path, *args, **kwargs):
+            # Python 3.12 raises when a root-only directory cannot be searched.
+            if path.name == "pending.json":
+                raise PermissionError(13, "Permission denied", str(path))
+            return exists(path, *args, **kwargs)
+        with patch.object(Path, "exists", denied):
+            checks = facts.diagnostics(self.paths, lambda args, timeout=0: "", inventory=[])["checks"]
+        check = next(item for item in checks if item["name"] == "Interrupted transaction")
+        self.assertEqual(check["status"], "info")
 
 
 if __name__ == "__main__":

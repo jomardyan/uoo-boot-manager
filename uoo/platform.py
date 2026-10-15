@@ -6,6 +6,7 @@ import platform
 import re
 
 ESP_TYPE = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+MBR_ESP_TYPE = "0xef"
 BIOS_TYPE = "21686148-6449-6e6f-744e-656564454649"
 
 
@@ -40,7 +41,7 @@ def devices(paths, runner):
                                    "parttype": node.get("parttype") or "", "size": node.get("size"),
                                    "partuuid": node.get("partuuid") or "",
                                    "readonly": bool(node.get("ro")),
-                                   "esp": str(node.get("parttype", "")).lower() == ESP_TYPE})
+                                   "esp": str(node.get("parttype", "")).lower() in (ESP_TYPE, MBR_ESP_TYPE)})
             collect(node.get("children") or [])
     collect(payload.get("blockdevices") or [])
     return result
@@ -130,9 +131,14 @@ def diagnostics(paths, runner, inventory=None):
                    "detail": str(paths.config) if grub else "An existing GRUB installation was not found."})
     supported, detail = env_support(paths, runner, inventory) if grub else (False, "GRUB is unavailable.")
     checks.append({"name": "GRUB saved/one-time boot", "status": "ok" if supported else "warning", "detail": detail})
-    pending = paths.state / "pending.json"
-    checks.append({"name": "Interrupted transaction", "status": "warning" if pending.exists() else "ok",
-                   "detail": "A pending update will be recovered before the next change." if pending.exists() else "No pending recovery."})
+    try:
+        pending = (paths.state / "pending.json").exists()
+    except OSError:
+        # Before Python 3.13, exists() raises when the root-only state directory cannot be searched.
+        pending = None
+    checks.append({"name": "Interrupted transaction", "status": "info" if pending is None else "warning" if pending else "ok",
+                   "detail": "Read as administrator to check for a pending recovery." if pending is None
+                   else "A pending update will be recovered before the next change." if pending else "No pending recovery."})
     return {"system": {"distribution": distribution, "kernel": platform.release(), "architecture": platform.machine(),
                        "boot_mode": "UEFI" if paths.efi.is_dir() else "BIOS", "secure_boot": secure_boot(paths)},
             "checks": checks, "devices": inventory, "environment_supported": supported}

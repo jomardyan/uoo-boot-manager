@@ -25,7 +25,7 @@ public static class BootConfiguration
             ?? throw new ArgumentException("Choose a Windows Uoo configuration file.");
         if (config.Format != "uoo-windows-configuration" || config.Version != 1 || config.Menu is null || config.Entries is null ||
             config.Entries.Count is < 1 or > 128 || config.Entries.Any(e => e is null) ||
-            config.Entries.Select(e => e.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != config.Entries.Count)
+            config.Entries.Select(e => BootValidation.Id(e.Id)).Distinct().Count() != config.Entries.Count)
             throw new ArgumentException("Unsupported or malformed Uoo Windows configuration.");
         BootValidation.ValidateMenu(config.Menu, snapshot);
         if (config.Menu.BootOnceId is null || config.Menu.BootOnceId.Length != 0)

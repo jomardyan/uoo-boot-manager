@@ -97,9 +97,12 @@ def restore_file(path, record):
 
 def sealed(record):
     raw = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
-    if len(raw) > MAX_RECORD:
+    envelope = json.dumps({"record": record, "sha256": hashlib.sha256(raw).hexdigest()}, sort_keys=True,
+                          separators=(",", ":"), ensure_ascii=True).encode()
+    # Readers cap the stored file, not the canonical record, at MAX_RECORD.
+    if len(envelope) > MAX_RECORD:
         raise RuntimeError("The backup is too large.")
-    return json.dumps({"record": record, "sha256": hashlib.sha256(raw).hexdigest()}, sort_keys=True).encode()
+    return envelope
 
 
 def unseal(raw):

@@ -1,15 +1,31 @@
 """Pure parsers and generated shell configuration must never execute input."""
 
-import subprocess
-import tempfile
 import unittest
-from pathlib import Path
 
 from uoo.core import (DEMO_CONFIG, Entry, override_text, parse_entries,
                       parse_firmware, parse_settings, structural_braces)
 
 
 class GrubParserTests(unittest.TestCase):
+    def test_declarations_after_other_commands_keep_grub_positions(self):
+        cases = {
+            "menuentry 'A' { true; }; menuentry 'B' { true; }\nmenuentry 'C' { true; }": ["A", "B", "C"],
+            "if true; then menuentry 'X' { true; }; fi\nmenuentry 'Y' { true; }": ["X", "Y"],
+            "echo menuentry 'not an entry'\nmenuentry 'Only' { true; }": ["Only"],
+        }
+        for config, titles in cases.items():
+            with self.subTest(config=config):
+                entries = parse_entries(config)
+                self.assertEqual([entry.title for entry in entries], titles)
+                self.assertEqual([entry.position for entry in entries], [str(index) for index in range(len(titles))])
+        nested = parse_entries("submenu 'S' { menuentry 'S1' { true; } }\nmenuentry 'Z' { true; }")
+        self.assertEqual([(entry.title, entry.position, entry.group) for entry in nested], [("S1", "0>0", "S"), ("Z", "1", "")])
+
+    def test_options_before_the_title_are_not_the_title(self):
+        for config in ("menuentry --class windows 'Windows' --id win { true; }", "menuentry --id win 'Windows' { true; }"):
+            with self.subTest(config=config):
+                self.assertEqual([(entry.title, entry.selector) for entry in parse_entries(config)], [("Windows", "win")])
+
     def test_demo_menu(self):
         entries = parse_entries(DEMO_CONFIG)
         self.assertEqual(len(entries), 5)
@@ -184,6 +200,20 @@ menuentry 'Real' --id real { }
 
 
 class GrubSettingsTests(unittest.TestCase):
+    def test_values_continue_across_lines_like_sh(self):
+        text = 'GRUB_CMDLINE_LINUX="cryptdevice=UUID=abcd:root \\\n  root=/dev/mapper/root"\nGRUB_TIMEOUT=5\n'
+        self.assertEqual(parse_settings(text), {"GRUB_CMDLINE_LINUX": "cryptdevice=UUID=abcd:root   root=/dev/mapper/root",
+                                                "GRUB_TIMEOUT": "5"})
+        # Lines inside a multi-line quoted value are not assignments.
+        settings = parse_settings('GRUB_CMDLINE_LINUX_DEFAULT="quiet\nGRUB_DEFAULT=uoo-0123\nsplash"\n')
+        self.assertEqual(settings, {"GRUB_CMDLINE_LINUX_DEFAULT": "quiet\nGRUB_DEFAULT=uoo-0123\nsplash"})
+
+    def test_only_shell_assignments_are_settings(self):
+        self.assertEqual(parse_settings("GRUB_DEFAULT=0\nGRUB_DEFAULT =2\n"), {"GRUB_DEFAULT": "0"})
+        self.assertEqual(parse_settings("GRUB_TIMEOUT=10\nGRUB_TIMEOUT= 3\n"), {"GRUB_TIMEOUT": "10"})
+        self.assertEqual(parse_settings("GRUB_DEFAULT=#x\nGRUB_GFXMODE= # empty\n"), {"GRUB_DEFAULT": "#x", "GRUB_GFXMODE": ""})
+        self.assertEqual(parse_settings('GRUB_A=1\nGRUB_B="unterminated\nGRUB_C=3\n'), {"GRUB_A": "1", "GRUB_C": "3"})
+
     def test_literal_settings(self):
         settings = parse_settings("""
 # GRUB_DEFAULT=other
@@ -333,20 +363,11 @@ class OverrideTests(unittest.TestCase):
             with self.subTest(selector=selector), self.assertRaises(ValueError):
                 override_text(selector, 5, "menu")
 
-    def test_malicious_selector_is_shell_literal(self):
-        with tempfile.TemporaryDirectory() as directory:
-            sentinel = Path(directory) / "must-not-exist"
-            selector = f"$(touch {sentinel}); 'quoted' `touch {sentinel}` $HOME \\ "
-            override = Path(directory) / "override.cfg"
-            override.write_text(override_text(selector, 5, "menu"), encoding="utf-8")
-            process = subprocess.run(
-                ["sh", "-c", '. "$1"; printf "%s\\n%s\\n%s\\n%s\\n" "$GRUB_DEFAULT" "$GRUB_TIMEOUT" "$GRUB_TIMEOUT_STYLE" "$GRUB_SAVEDEFAULT"',
-                 "uoo-test", str(override)],
-                text=True, capture_output=True, check=True,
-            )
-            self.assertEqual(process.stdout.splitlines(), [selector, "5", "menu", "false"])
-            self.assertFalse(sentinel.exists())
-            self.assertEqual(parse_settings(override.read_text())["GRUB_DEFAULT"], selector)
+    def test_selectors_unsafe_in_grub_cfg_are_rejected(self):
+        # 00_header writes set default="${GRUB_DEFAULT}" into grub.cfg.
+        for selector in ('x"; fwsetup; echo "', "$(touch /tmp/no)", "a b", "`id`", "a;b"):
+            with self.subTest(selector=selector), self.assertRaises(ValueError):
+                override_text(selector, 5, "menu")
 
 
 if __name__ == "__main__":

@@ -373,5 +373,47 @@ foreach (var loader in new[] { @"\EFI\boot\bootx64.efi" + "\n", @"\EFI\boot.\boo
     await Test("reject malformed EFI path " + JsonSerializer.Serialize(loader), () => Reject(new() { Operation = BootOperation.AddFirmwareEntry, Description = "Test", EfiPartition = @"S:\", EfiLoaderPath = loader }));
 foreach (var partition in new[] { @"S:\" + "\n", @"\\?\Volume{------------------------------------}\" })
     await Test("reject malformed ESP " + JsonSerializer.Serialize(partition), () => Reject(new() { Operation = BootOperation.AddFirmwareEntry, Description = "Test", EfiPartition = partition, EfiLoaderPath = @"\EFI\boot\bootx64.efi" }));
+await Test("directory services repair safe mode is supported", async () =>
+{
+    var options = new BootEntryOptions { SafeBoot = "DsRepair" };
+    BootValidation.ValidateOptions(options);
+    var state = await Apply(new DemoBootService(), new() { Operation = BootOperation.SetEntryOptions, TargetId = DemoBootService.OtherWindowsId, Options = options });
+    Check(state.Entries.Single(x => x.Id == DemoBootService.OtherWindowsId).Options.SafeBoot == "DsRepair");
+});
+await Test("identifiers must be exact braced GUIDs", () =>
+{
+    Check(BootValidation.Id(DemoBootService.WindowsId.ToUpperInvariant()) == DemoBootService.WindowsId);
+    foreach (var id in new[] { " " + DemoBootService.WindowsId, DemoBootService.WindowsId + " ", "\t" + DemoBootService.WindowsId + "\n", DemoBootService.WindowsId.Trim('{', '}') })
+    {
+        bool refused = false; try { BootValidation.Id(id); } catch (ArgumentException) { refused = true; }
+        Check(refused, "Accepted " + JsonSerializer.Serialize(id));
+    }
+    return Task.CompletedTask;
+});
+await Test("reject whitespace-padded menu duplicate", () => Reject(new() { Operation = BootOperation.SetMenu, Menu = new() { DefaultId = DemoBootService.WindowsId, Order = [DemoBootService.WindowsId, " " + DemoBootService.WindowsId + " "] } }));
+await Test("reject whitespace-padded firmware order duplicate", () => Reject(new() { Operation = BootOperation.SetFirmwareOrder, Order = [DemoBootService.FirmwareWindowsId, DemoBootService.FirmwareUbuntuId, DemoBootService.FirmwareUbuntuId + " "] }));
+await Test("reject whitespace-padded target", () => Reject(new() { Operation = BootOperation.RenameEntry, TargetId = " " + DemoBootService.OtherWindowsId, Description = "Padded" }));
+await Test("reject whitespace-padded duplicate import entries without a backup", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var config = new WindowsConfiguration
+    {
+        Menu = before.Menu,
+        Entries = [new() { Id = DemoBootService.OtherWindowsId, Description = "First" }, new() { Id = " " + DemoBootService.OtherWindowsId + " ", Description = "Second" }]
+    };
+    var response = await Send(service, new() { Operation = BootOperation.ImportConfiguration, ConfigurationJson = JsonSerializer.Serialize(config, BootJson.Options) });
+    Check(!response.Success && response.Snapshot!.Revision == before.Revision && response.Snapshot.Backups.Count == 0);
+});
+await Test("JSON protocol accepts only exact operation names", () =>
+{
+    foreach (var json in new[] { "{\"operation\":\"SetMenu, CopyEntry\"}", "{\"operation\":\"Inspect,Inspect\"}", "{\"operation\":\"setmenu\"}", "{\"operation\":\" Inspect\"}", "{\"operation\":\"5\"}", "{\"operation\":null}" })
+    {
+        bool rejected = false; try { JsonSerializer.Deserialize<BootRequest>(json, BootJson.Options); } catch (JsonException) { rejected = true; }
+        Check(rejected, "Accepted " + json);
+    }
+    foreach (var operation in Enum.GetValues<BootOperation>())
+        Check(JsonSerializer.Deserialize<BootRequest>(JsonSerializer.Serialize(new BootRequest { Operation = operation }, BootJson.Options), BootJson.Options)!.Operation == operation);
+    return Task.CompletedTask;
+});
 Console.WriteLine($"{passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

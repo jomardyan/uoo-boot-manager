@@ -26,6 +26,11 @@ except (ModuleNotFoundError, ValueError) as exc:
     AVAILABLE = False
 
 
+def ui_value(widget):
+    from uoo import gtk_widgets
+    return gtk_widgets.combo_value(widget)
+
+
 def png():
     def chunk(kind, payload):
         return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff)
@@ -119,6 +124,46 @@ class NativeDesktopTests(unittest.TestCase):
         self.assertEqual(self.window.snapshot["settings"]["GRUB_GFXMODE"], "1280x720")
         self.assertEqual(self.window.snapshot["settings"]["GRUB_TIMEOUT_STYLE"], "countdown")
         self.assert_no_errors()
+
+    def test_grub_forms_send_only_edited_settings(self):
+        # A value the form shows inexactly (an unlisted payload, a misread command line) must survive other edits.
+        self.window.snapshot["settings"]["GRUB_GFXPAYLOAD_LINUX"] = "1024x768"
+        self.window._render()
+        self.assertEqual(ui_value(self.window.payload), "keep")
+        requests = []
+        with patch.object(self.window, "_mutate", lambda request, *_args: requests.append(request)):
+            self.window.recordfail_timeout.set_value(self.window.recordfail_timeout.get_value_as_int() + 5)
+            self.window.apply_advanced()
+            self.window.fields["GRUB_GFXMODE"].set_text("1280x720")
+            self.window.apply_appearance()
+            self.window.apply_appearance()
+        self.assertEqual([set(request["changes"]) for request in requests[:2]], [{"GRUB_RECORDFAIL_TIMEOUT"}, {"GRUB_GFXMODE"}])
+        self.assertEqual(len(requests), 3)
+
+    def test_stale_boot_order_id_can_be_excluded(self):
+        firmware = self.window.snapshot["firmware"]
+        firmware["order"] = firmware["order"] + ["00FF"]
+        self.window._render()
+        self.window.select_firmware("00FF")
+        self.assertTrue(self.window.buttons["firmware_include"].get_sensitive())
+        self.window.toggle_order_inclusion()
+        self.assertNotIn("00FF", self.window.order)
+
+    def test_failed_first_read_replaces_the_loading_banner(self):
+        window = BootWindow(self.application, demo=True)
+        window.error_handler = lambda *_args: None
+        self.addCleanup(window.dispose_window)
+
+        def idle():
+            deadline = time.monotonic() + 3
+            while window.busy and time.monotonic() < deadline:
+                GLib.MainContext.default().iteration(False)
+        idle()
+        with patch.object(window.demo_manager, "dispatch", side_effect=RuntimeError("unreadable")):
+            window.snapshot = {}
+            window._reload()
+            idle()
+        self.assertEqual(window.banner.get_title(), "The boot configuration could not be read")
 
     def test_invalid_kernel_options_are_rejected_before_dispatch(self):
         before = copy.deepcopy(self.window.snapshot)

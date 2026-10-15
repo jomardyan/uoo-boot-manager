@@ -56,6 +56,10 @@ public sealed class WindowsBootService : IBootService
                 var manual = backups.Create(bcd, before, string.IsNullOrWhiteSpace(request.Description) ? "Manual boot configuration backup" : BootValidation.Description(request.Description));
                 return new() { Success = true, Snapshot = Inspect(bcd), Message = "Backup created: " + manual.Id };
             }
+            // Any other change would fail menu verification after applying; only these operations can repair the menu.
+            var menuVerified = Verified(before);
+            if (!menuVerified && request.Operation is not (BootOperation.SetMenu or BootOperation.ImportConfiguration or BootOperation.RestoreBackup))
+                throw new InvalidOperationException("The boot menu is missing the default or running Windows entry. Set the boot menu, import a configuration, or restore a backup first. No boot settings were changed.");
             var protection = WindowsMachine.BitLocker();
             if (protection.Protection != 0 && !request.RecoveryKeyAcknowledged)
                 throw new InvalidOperationException(protection.Protection == 1
@@ -114,9 +118,10 @@ public sealed class WindowsBootService : IBootService
                 if (removal is not null) ValidateFirmwareRecreation(removal);
             }
             backups.Journal(backup.Id);
+            List<string> recreated = [];
             try
             {
-                Change(bcd, request, before, esp, created, restore, configuration);
+                Change(bcd, request, before, esp, created, restore, configuration, recreated);
                 var after = Inspect(bcd);
                 Verify(after);
                 VerifyRequested(request, before, after);
@@ -125,7 +130,13 @@ public sealed class WindowsBootService : IBootService
             }
             catch (Exception error)
             {
-                try { Restore(bcd, backup, true); Verify(Inspect(bcd)); backups.Complete(); }
+                try
+                {
+                    // Registrations re-created by a failed restore did not exist before it.
+                    var existing = bcd.Enumerate();
+                    foreach (var id in recreated.Where(id => existing.Any(r => r.Id == id))) DeleteFirmware(bcd, id);
+                    Restore(bcd, backup, true); Verify(Inspect(bcd), menuVerified); backups.Complete();
+                }
                 catch (Exception rollback) { throw new IOException("The change failed and recovery is incomplete. The protected journal and backup were retained; reopen as administrator to retry recovery. Change: " + error.Message + " Recovery: " + rollback.Message, rollback); }
                 throw new IOException("The change failed. Previous boot settings were restored: " + error.Message, error);
             }
@@ -202,9 +213,10 @@ public sealed class WindowsBootService : IBootService
         if (referenced) throw new ArgumentException("Another Windows recovery or boot object references this entry. Its registration cannot be deleted.");
     }
 
-    private static BootEntryOptions ReadOptions(BcdRecord entry) => new()
+    internal static BootEntryOptions ReadOptions(BcdRecord entry) => new()
     {
-        SafeBoot = !entry.Elements.ContainsKey(Bcd.SafeBoot) ? "Off" : entry.Flag(0x26000081) ? "AlternateShell" : entry.Number(Bcd.SafeBoot) == 1 ? "Network" : "Minimal",
+        SafeBoot = !entry.Elements.ContainsKey(Bcd.SafeBoot) ? "Off" : entry.Flag(0x26000081) ? "AlternateShell" :
+            entry.Number(Bcd.SafeBoot) switch { 1 => "Network", 2 => "DsRepair", _ => "Minimal" },
         BootLog = entry.Flag(Bcd.BootLog), Sos = entry.Flag(Bcd.Sos), BaseVideo = entry.Flag(Bcd.BaseVideo),
         RecoveryEnabled = entry.Flag(Bcd.Recovery, true), MenuPolicy = entry.Number(Bcd.MenuPolicy, 1) == 0 ? "Legacy" : "Standard"
     };
@@ -225,19 +237,21 @@ public sealed class WindowsBootService : IBootService
         var normalized = records.OrderBy(r => r.Id).Select(r => new { r.Id, r.Type, Elements = r.RawElements?.OrderBy(e => e.Key).ToArray(), Known = r.RawElements is null ? r.Elements.OrderBy(e => e.Key).ToArray() : null });
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { current, records = normalized }))));
     }
-    private static void Verify(BootSnapshot state)
+    internal static bool Verified(BootSnapshot state, bool menu = true) =>
+        state.Errors.Count == 0 && state.Entries.Count(e => e.IsCurrent && e.IsWindows) == 1 &&
+        (!menu || state.Menu.Order.Contains(state.Menu.DefaultId) && state.Menu.Order.Contains(state.Entries.Single(e => e.IsCurrent).Id)) &&
+        state.Menu.Order.All(id => state.Entries.Any(e => e.Id == id));
+    private static void Verify(BootSnapshot state, bool menu = true)
     {
-        if (state.Errors.Count != 0 || state.Entries.Count(e => e.IsCurrent && e.IsWindows) != 1 ||
-            !state.Menu.Order.Contains(state.Menu.DefaultId) || !state.Menu.Order.Contains(state.Entries.Single(e => e.IsCurrent).Id) ||
-            state.Menu.Order.Any(id => state.Entries.All(e => e.Id != id))) throw new IOException("Windows boot configuration verification failed.");
+        if (!Verified(state, menu)) throw new IOException("Windows boot configuration verification failed.");
     }
     private static void VerifyRequested(BootRequest request, BootSnapshot before, BootSnapshot after)
     {
         bool Same(IEnumerable<string> first, IEnumerable<string> second) => first.SequenceEqual(second, StringComparer.OrdinalIgnoreCase);
         bool valid = request.Operation switch
         {
-            BootOperation.SetMenu => after.Menu.DefaultId.Equals(request.Menu!.DefaultId, StringComparison.OrdinalIgnoreCase) && after.Menu.Timeout == request.Menu.Timeout &&
-                after.Menu.DisplayMenu == request.Menu.DisplayMenu && Same(after.Menu.Order, request.Menu.Order) && after.Menu.BootOnceId == before.Menu.BootOnceId,
+            BootOperation.SetMenu => after.Menu.DefaultId == Bcd.Id(request.Menu!.DefaultId) && after.Menu.Timeout == request.Menu.Timeout &&
+                after.Menu.DisplayMenu == request.Menu.DisplayMenu && Same(after.Menu.Order, request.Menu.Order.Select(Bcd.Id)) && after.Menu.BootOnceId == before.Menu.BootOnceId,
             BootOperation.SetEntryOptions => after.Entries.Single(e => e.Id == Bcd.Id(request.TargetId)).Options == request.Options,
             BootOperation.RenameEntry => after.Entries.Single(e => e.Id == Bcd.Id(request.TargetId)).Description == BootValidation.Description(request.Description),
             BootOperation.CopyEntry => after.Entries.Where(e => before.Entries.All(old => old.Id != e.Id)).ToList() is var added && added.Count == 1 &&
@@ -245,7 +259,7 @@ public sealed class WindowsBootService : IBootService
             BootOperation.DeleteEntry => after.Entries.All(e => e.Id != Bcd.Id(request.TargetId)) && !after.Menu.Order.Contains(Bcd.Id(request.TargetId)),
             BootOperation.SetBootOnce => after.Menu.BootOnceId == Bcd.Id(request.TargetId),
             BootOperation.ClearBootOnce => after.Menu.BootOnceId.Length == 0,
-            BootOperation.SetFirmwareOrder => after.Firmware.Available && Same(after.Firmware.Order, request.Order),
+            BootOperation.SetFirmwareOrder => after.Firmware.Available && Same(after.Firmware.Order, request.Order.Select(Bcd.Id)),
             BootOperation.SetFirmwareBootOnce => after.Firmware.BootOnceId == Bcd.Id(request.TargetId),
             BootOperation.ClearFirmwareBootOnce => after.Firmware.BootOnceId.Length == 0,
             BootOperation.AddFirmwareEntry => after.Firmware.Entries.Where(e => before.Firmware.Entries.All(old => old.Id != e.Id)).ToList() is var added && added.Count == 1 &&
@@ -271,12 +285,14 @@ public sealed class WindowsBootService : IBootService
     {
         BootValidation.ValidateOptions(options);
         if (options.SafeBoot == "Off") { bcd.DeleteElement(id, Bcd.SafeBoot); bcd.DeleteElement(id, 0x26000081); }
-        else { bcd.Integer(id, Bcd.SafeBoot, options.SafeBoot == "Network" ? 1ul : 0ul); bcd.Boolean(id, 0x26000081, options.SafeBoot == "AlternateShell"); }
+        else { bcd.Integer(id, Bcd.SafeBoot, SafeBootValue(options.SafeBoot)); bcd.Boolean(id, 0x26000081, options.SafeBoot == "AlternateShell"); }
         bcd.Boolean(id, Bcd.BootLog, options.BootLog); bcd.Boolean(id, Bcd.Sos, options.Sos); bcd.Boolean(id, Bcd.BaseVideo, options.BaseVideo);
         bcd.Boolean(id, Bcd.Recovery, options.RecoveryEnabled); bcd.Integer(id, Bcd.MenuPolicy, options.MenuPolicy == "Legacy" ? 0ul : 1ul);
     }
 
-    private void Change(BcdStore bcd, BootRequest request, BootSnapshot before, EspPartition? esp, FirmwareImage? created, BackupManifest? restore, WindowsConfiguration? configuration)
+    internal static ulong SafeBootValue(string safeBoot) => safeBoot switch { "Network" => 1ul, "DsRepair" => 2ul, _ => 0ul };
+
+    private void Change(BcdStore bcd, BootRequest request, BootSnapshot before, EspPartition? esp, FirmwareImage? created, BackupManifest? restore, WindowsConfiguration? configuration, List<string> recreated)
     {
         switch (request.Operation)
         {
@@ -297,7 +313,7 @@ public sealed class WindowsBootService : IBootService
                 CreateFirmware(bcd, created!); bcd.Objects(Bcd.Firmware, Bcd.Order, before.Firmware.Order.Append(created!.Id)); break;
             case BootOperation.DeleteFirmwareEntry:
                 bcd.Objects(Bcd.Firmware, Bcd.Order, before.Firmware.Order.Where(id => id != Bcd.Id(request.TargetId))); bcd.Delete(request.TargetId); break;
-            case BootOperation.RestoreBackup: Restore(bcd, restore!, false); break;
+            case BootOperation.RestoreBackup: Restore(bcd, restore!, false, recreated); break;
             case BootOperation.ImportConfiguration:
                 foreach (var entry in configuration!.Entries) { bcd.String(entry.Id, Bcd.Description, entry.Description); SetOptions(bcd, entry.Id, entry.Options); }
                 SetMenu(bcd, configuration.Menu); break;
@@ -337,10 +353,15 @@ public sealed class WindowsBootService : IBootService
         var saved = archived.Enumerate(); var current = live.Read(Bcd.Current).Id;
         if (manifest.CurrentId != current || !saved.Any(e => e.Id == current && e.Type == Bcd.WindowsLoader))
             throw new IOException("The backup does not contain the running Windows loader.");
-        var manager = archived.Read(Bcd.Manager); var order = manager.Ids(Bcd.Order); var defaultId = manager.Text(Bcd.Default);
-        if (!order.Contains(current) || !order.Contains(defaultId) || order.Any(id => !saved.Any(e => e.Id == id)))
-            throw new IOException("The backed-up boot menu has a missing current or default loader.");
-        if (!rollback) WindowsMachine.ValidateWindowsLoader(saved.Single(e => e.Id == defaultId));
+        // Rollback must always put back the exact previous state, even a menu that lacked the default or running loader.
+        if (!rollback)
+        {
+            var manager = archived.Read(Bcd.Manager); var order = manager.Ids(Bcd.Order); var defaultId = manager.Text(Bcd.Default);
+            if (defaultId.Length != 0) defaultId = Bcd.Id(defaultId);
+            if (!order.Contains(current) || !order.Contains(defaultId) || order.Any(id => !saved.Any(e => e.Id == id)))
+                throw new IOException("The backed-up boot menu has a missing current or default loader.");
+            WindowsMachine.ValidateWindowsLoader(saved.Single(e => e.Id == defaultId));
+        }
         var records = live.Enumerate();
         if (!rollback) ValidateIntegrityRestore(saved, records);
         foreach (var image in manifest.Firmware)
@@ -419,18 +440,21 @@ public sealed class WindowsBootService : IBootService
         // A fresh registration did not exist at the start of this proven boot session, so
         // it cannot be BootCurrent even when the firmware provider cannot identify BootCurrent.
     }
-    private void Restore(BcdStore bcd, BackupManifest manifest, bool rollback)
+    private static void DeleteFirmware(BcdStore bcd, string id)
+    {
+        bcd.Objects(Bcd.Firmware, Bcd.Sequence, bcd.Read(Bcd.Firmware).Ids(Bcd.Sequence).Where(other => other != id));
+        bcd.Objects(Bcd.Firmware, Bcd.Order, bcd.Read(Bcd.Firmware).Ids(Bcd.Order).Where(other => other != id));
+        bcd.Delete(id);
+    }
+    private void Restore(BcdStore bcd, BackupManifest manifest, bool rollback, List<string>? recreated = null)
     {
         ValidateRestore(bcd, manifest, rollback);
         var records = bcd.Enumerate();
         var previousFirmwareOrder = manifest.Firmware.Count == 0 ? [] : bcd.Read(Bcd.Firmware).Ids(Bcd.Order);
-        foreach (var missing in manifest.Firmware.Where(image => records.All(r => r.Id != image.Id))) CreateFirmware(bcd, missing);
+        foreach (var missing in manifest.Firmware.Where(image => records.All(r => r.Id != image.Id)))
+        { recreated?.Add(missing.Id); CreateFirmware(bcd, missing); }
         if (manifest.CreatedFirmwareId.Length != 0 && records.Any(r => r.Id == manifest.CreatedFirmwareId))
-        {
-            bcd.Objects(Bcd.Firmware, Bcd.Sequence, bcd.Read(Bcd.Firmware).Ids(Bcd.Sequence).Where(id => id != manifest.CreatedFirmwareId));
-            bcd.Objects(Bcd.Firmware, Bcd.Order, bcd.Read(Bcd.Firmware).Ids(Bcd.Order).Where(id => id != manifest.CreatedFirmwareId));
-            bcd.Delete(manifest.CreatedFirmwareId);
-        }
+            DeleteFirmware(bcd, manifest.CreatedFirmwareId);
         backups.RestoreTree(manifest); backups.ImportBcd(bcd, manifest);
         RestoreFirmware(bcd, manifest, previousFirmwareOrder);
         using var archived = backups.OpenBcd(manifest);

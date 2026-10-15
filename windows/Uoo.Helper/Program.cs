@@ -18,14 +18,18 @@ try
     using var pipe = new NamedPipeClientStream(".", args[1], PipeDirection.InOut,
         PipeOptions.Asynchronous, TokenImpersonationLevel.Identification);
     await pipe.ConnectAsync(60_000, lifetime.Token);
-    var json = await PipeProtocol.ReadAsync(pipe, lifetime.Token);
-    var request = JsonSerializer.Deserialize<BootRequest>(json, BootJson.Options)
-        ?? throw new InvalidDataException("The administrator request was empty.");
-    // Production elevated requests must come from the protected installation. An explicit
-    // direct developer/offline test uses WindowsBootService without this transport.
-    ProtectedInstallation.Verify(AppContext.BaseDirectory);
+    // Once connected, always answer so the desktop sees the real failure instead of a closed pipe.
     BootResponse result;
-    try { result = await new WindowsBootService().ExecuteAsync(request, lifetime.Token); }
+    try
+    {
+        var json = await PipeProtocol.ReadAsync(pipe, lifetime.Token);
+        var request = JsonSerializer.Deserialize<BootRequest>(json, BootJson.Options)
+            ?? throw new InvalidDataException("The administrator request was empty.");
+        // Production elevated requests must come from the protected installation. An explicit
+        // direct developer/offline test uses WindowsBootService without this transport.
+        ProtectedInstallation.Verify(AppContext.BaseDirectory);
+        result = await new WindowsBootService().ExecuteAsync(request, lifetime.Token);
+    }
     catch (Exception error) { result = new() { Success = false, Message = error.Message }; }
     await PipeProtocol.WriteAsync(pipe, JsonSerializer.Serialize(result, BootJson.Options), lifetime.Token);
     return result.Success ? 0 : 1;

@@ -196,7 +196,8 @@ class DemoTests(unittest.TestCase):
     def test_invalid_loader_create(self):
         base = {"label": "Fedora", "disk": "/dev/sda", "partition": 1, "loader": "/EFI/fedora/shimx64.efi"}
         for changes in ({"partition": True}, {"partition": 2}, {"disk": "/dev/sdb"},
-                        {"loader": "/EFI/../x.efi"}, {"label": "bad'; reboot"}):
+                        {"loader": "/EFI/../x.efi"}, {"loader": "/EFI/fedora/shim.txt"}, {"label": ""},
+                        {"label": " Fedora"}, {"label": "Fedora "}, {"label": "A" * 121}, {"label": "bad\x01"}, {"label": None}):
             with self.subTest(changes=changes):
                 self.assert_refused_without_changes("create_uefi", **{**base, **changes})
 
@@ -339,8 +340,104 @@ class DemoTests(unittest.TestCase):
         before = self.state()
         response = self.dispatch("repair", plan=plan["id"], confirm=plan["confirmation"])
         self.assertEqual(response["snapshot"], before)
-        self.assertEqual(response["backups"][0]["kind"], "all")
+        self.assertEqual(response["backups"][0]["kind"], "uefi_repair")
         self.assertIn("No restart", response["message"])
+
+    def test_repair_restore_leaves_grub_settings_and_firmware(self):
+        backup = self.dispatch("repair", plan="demo-repair", confirm="/boot/efi")["backups"][0]["id"]
+        self.dispatch("apply_grub", changes={"GRUB_TIMEOUT": 4})
+        self.dispatch("grub_next_boot", entry="windows")
+        self.dispatch("next_boot", entry="0002")
+        before = self.state()
+        response = self.dispatch("restore", backup=backup)
+        self.assertEqual(response["snapshot"], before)
+        self.assertEqual(response["backups"][0]["kind"], "uefi_repair")
+
+    def test_firmware_labels_follow_helper_rules(self):
+        for label in ("Bob's Linux", "Fedora; test", "A" * 120):
+            with self.subTest(label=label):
+                state = self.dispatch("create_uefi", label=label, disk="/dev/sda", partition=1, loader="/EFI/fedora/shimx64.efi")["snapshot"]
+                self.assertEqual(state["firmware"]["entries"][-1]["label"], label)
+
+    def test_grub_settings_restore_leaves_custom_entries_and_next_choice(self):
+        backup = self.dispatch("apply_grub", changes={"GRUB_TIMEOUT": 5})["backups"][0]["id"]
+        self.dispatch("grub_next_boot", entry="windows")
+        self.dispatch("custom_entries", entries=[custom_entry()])
+        self.dispatch("apply_background", png=base64.b64encode(png_data()).decode("ascii"))
+        state = self.dispatch("restore", backup=backup)["snapshot"]
+        self.assertEqual(state["settings"]["GRUB_TIMEOUT"], "10")
+        self.assertEqual(state["grub_next"], "windows")
+        self.assertEqual(len(state["custom_entries"]), 1)
+        self.assertTrue(state["background"])
+
+    def test_background_and_custom_restores_are_scoped(self):
+        background = self.dispatch("apply_background", png=base64.b64encode(png_data()).decode("ascii"))["backups"][0]["id"]
+        custom = self.dispatch("custom_entries", entries=[custom_entry()])["backups"][0]["id"]
+        self.dispatch("grub_next_boot", entry=custom_entry()["id"])
+        self.dispatch("apply_grub", changes={"GRUB_TIMEOUT": 3})
+        state = self.dispatch("restore", backup=background)["snapshot"]
+        self.assertFalse(state["background"])
+        self.assertEqual(state["background_info"], {})
+        self.assertEqual(state["settings"]["GRUB_TIMEOUT"], "10")
+        self.assertEqual(state["grub_next"], custom_entry()["id"])
+        self.assertEqual(len(state["custom_entries"]), 1)
+        self.assert_refused_without_changes("restore", backup=custom)
+        self.dispatch("grub_next_boot", entry="")
+        self.dispatch("apply_grub", changes={"GRUB_TIMEOUT": 7})
+        state = self.dispatch("restore", backup=custom)["snapshot"]
+        self.assertEqual(state["custom_entries"], [])
+        self.assertEqual(state["settings"]["GRUB_TIMEOUT"], "7")
+
+    def test_next_boot_restore_refuses_inactive_entry(self):
+        self.dispatch("next_boot", entry="0002")
+        backup = self.dispatch("next_boot", entry="")["backups"][0]["id"]
+        self.dispatch("set_active", entry="0002", active=False)
+        self.assert_refused_without_changes("restore", backup=backup)
+        with self.assertRaisesRegex(ValueError, "inactive firmware entry"):
+            self.dispatch("restore", backup=backup)
+        self.dispatch("set_active", entry="0002", active=True)
+        self.assertEqual(self.dispatch("restore", backup=backup)["snapshot"]["firmware"]["next"], "0002")
+
+    def test_grub_requests_match_helper_validation(self):
+        self.assert_refused_without_changes("apply_grub", changes={})
+        for selector in ("0", "2", "1>0"):
+            with self.subTest(selector=selector):
+                self.assertEqual(self.dispatch("apply_grub", changes={"GRUB_DEFAULT": selector})["snapshot"]["settings"]["GRUB_DEFAULT"], selector)
+        self.assert_refused_without_changes("apply_grub", changes={"GRUB_DEFAULT": "9"})
+        self.assert_refused_without_changes("grub_next_boot", entry="2")
+        settings = self.dispatch("apply_grub", changes={"GRUB_DEFAULT": "windows", "GRUB_SAVEDEFAULT": True})["snapshot"]["settings"]
+        self.assertEqual((settings["GRUB_DEFAULT"], settings["GRUB_SAVEDEFAULT"]), ("saved", "true"))
+        envelope = {"format": "uoo-configuration", "version": 1,
+                    "configuration": {"grub": {"GRUB_DEFAULT": "0"}, "custom_entries": []}}
+        self.assertEqual(self.dispatch("import_configuration", data=envelope)["snapshot"]["settings"]["GRUB_DEFAULT"], "0")
+
+    def test_positional_default_protects_its_custom_entry(self):
+        self.dispatch("custom_entries", entries=[custom_entry()])
+        self.dispatch("apply_grub", changes={"GRUB_DEFAULT": "4"})
+        self.assert_refused_without_changes("custom_entries", entries=[])
+
+    def test_pre_restore_backup_kinds_match_helper(self):
+        firmware = [self.dispatch("set_active", entry="0002", active=False), self.dispatch("apply_order", order=["0001", "0000"]),
+                    self.dispatch("next_boot", entry="0001"), self.dispatch("create_backup", kind="uefi")]
+        for response in firmware:
+            backup = response.get("backup") or response["backups"][0]["id"]
+            with self.subTest(backup=backup):
+                self.assertEqual(self.dispatch("restore", backup=backup)["backups"][0]["kind"], "uefi")
+        for action, fields, kind in (("create_backup", {"kind": "grub"}, "grub"), ("create_backup", {"kind": "all"}, "all"),
+                                     ("apply_grub", {"changes": {"GRUB_TIMEOUT": 6}}, "grub"),
+                                     ("grub_next_boot", {"entry": "windows"}, "grub_next")):
+            response = self.dispatch(action, **fields)
+            backup = response.get("backup") or response["backups"][0]["id"]
+            with self.subTest(action=action, kind=kind):
+                self.assertEqual(self.dispatch("restore", backup=backup)["backups"][0]["kind"], kind)
+
+    def test_undoing_a_firmware_restore_removes_the_recreated_entry(self):
+        deletion = self.dispatch("delete_uefi", entry="0001", confirm="0001")["backups"][0]["id"]
+        undo = self.dispatch("restore", backup=deletion)["backups"][0]["id"]
+        self.assertIn("0001", [entry["id"] for entry in self.state()["firmware"]["entries"]])
+        state = self.dispatch("restore", backup=undo)["snapshot"]
+        self.assertNotIn("0001", [entry["id"] for entry in state["firmware"]["entries"]])
+        self.assertNotIn("0001", state["firmware"]["order"])
 
 
 if __name__ == "__main__":

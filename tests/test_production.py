@@ -73,6 +73,7 @@ class ProductionTests(unittest.TestCase):
         self.generated_base_config = DEMO_CONFIG
         self.fail_efi_once = False
         self.fail_efi_always = False
+        self.efibootmgr18 = False
         self.reject_absent_efi_deletes = True
         self.boot_source = "/dev/sda2"
         self.boot_filesystem = "ext4"
@@ -203,7 +204,9 @@ class ProductionTests(unittest.TestCase):
                 text += "BootNext: " + self.firmware["next"] + "\n"
             for entry in self.firmware["entries"]:
                 loader = entry["loader"].replace("/", "\\")
-                text += f"Boot{entry['id']}{'*' if entry['active'] else ' '} {entry['label']}\tHD(1,GPT,{ESP_PARTUUID},0x800,0x100000)/File({loader})\n"
+                # efibootmgr 18 prints the bare file path followed by any optional data as hex.
+                path = f"{loader}57494e444f5753" if self.efibootmgr18 else f"File({loader})"
+                text += f"Boot{entry['id']}{'*' if entry['active'] else ' '} {entry['label']}\tHD(1,GPT,{ESP_PARTUUID},0x800,0x100000)/{path}\n"
             return text
         raise AssertionError("Unexpected fixture command: " + repr(args))
 
@@ -544,6 +547,28 @@ class ProductionTests(unittest.TestCase):
         self.dispatch("restore", backup=backup)
         self.assertEqual({entry["id"]: entry for entry in self.firmware["entries"]}, {entry["id"]: entry for entry in original["entries"]})
         self.assertEqual(self.firmware["order"], original["order"])
+
+    def test_efibootmgr_18_device_paths_keep_deletion_restorable(self):
+        self.efibootmgr18 = True
+        self.test_firmware_deletion_backup_recreates_original_id_and_order()
+
+    def test_order_change_allowed_when_current_entry_is_outside_boot_order(self):
+        # Booting through a one-time or firmware menu choice leaves BootCurrent outside BootOrder.
+        self.firmware["order"] = ["0001", "0002"]
+        self.dispatch("apply_order", order=["0002", "0001"])
+        self.assertEqual(self.firmware["order"], ["0002", "0001"])
+
+    def test_restore_refuses_to_schedule_an_inactive_next_boot_entry(self):
+        self.dispatch("next_boot", entry="0002")
+        backup = self.backup_id(self.dispatch("next_boot", entry=""))
+        self.dispatch("set_active", entry="0002", active=False)
+        with self.assertRaisesRegex(ValueError, "inactive firmware entry"):
+            self.dispatch("restore", backup=backup)
+        self.assertEqual(self.firmware["next"], "")
+
+    def test_creation_rejects_labels_with_surrounding_whitespace(self):
+        with self.assertRaisesRegex(ValueError, "firmware label"):
+            self.dispatch("create_uefi", label="Fedora ", disk="/dev/sda", partition=1, loader="/EFI/fedora/shimx64.efi")
 
     def test_creation_undo_refuses_reused_id_without_removing_unrelated_loader(self):
         backup = self.backup_id(self.dispatch("create_uefi", label="Fedora", disk="/dev/sda", partition=1, loader="/EFI/fedora/shimx64.efi"))

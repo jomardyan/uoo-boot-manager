@@ -8,7 +8,8 @@ public static partial class BootValidation
     public static bool RequiresRecoveryKey(BootSnapshot snapshot) => !snapshot.Demo && (snapshot.BitLockerProtectionEnabled || !snapshot.BitLockerStatusKnown);
     public static string Id(string value)
     {
-        if (value is null || !Guid.TryParseExact(value, "B", out var guid) || guid == Guid.Empty)
+        // TryParseExact trims surrounding whitespace; only the exact braced form identifies an entry.
+        if (value is null || value.Length != 38 || !Guid.TryParseExact(value, "B", out var guid) || guid == Guid.Empty)
             throw new ArgumentException("Choose a boot entry with a valid identifier.");
         return guid.ToString("B");
     }
@@ -23,8 +24,8 @@ public static partial class BootValidation
     public static void ValidateOptions(BootEntryOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.SafeBoot is not ("Off" or "Minimal" or "Network" or "AlternateShell"))
-            throw new ArgumentException("Safe mode must be Off, Minimal, Network, or AlternateShell.");
+        if (options.SafeBoot is not ("Off" or "Minimal" or "Network" or "DsRepair" or "AlternateShell"))
+            throw new ArgumentException("Safe mode must be Off, Minimal, Network, DsRepair, or AlternateShell.");
         if (options.MenuPolicy is not ("Standard" or "Legacy"))
             throw new ArgumentException("Boot menu style must be Standard or Legacy.");
     }
@@ -53,10 +54,13 @@ public static partial class BootValidation
 
     public static void ValidateOrder(IReadOnlyList<string> order, ISet<string> allowed)
     {
-        if (order is null || order.Count is < 1 or > 128 || order.Distinct(StringComparer.OrdinalIgnoreCase).Count() != order.Count)
+        if (order is null || order.Count is < 1 or > 128)
             throw new ArgumentException("Choose a nonempty boot order without duplicate entries.");
-        foreach (var id in order)
-            if (!allowed.Contains(Id(id))) throw new ArgumentException("The boot order contains an entry that is no longer available. Reload first.");
+        var ids = order.Select(Id).ToList();
+        if (ids.Distinct().Count() != ids.Count)
+            throw new ArgumentException("Choose a nonempty boot order without duplicate entries.");
+        foreach (var id in ids)
+            if (!allowed.Contains(id)) throw new ArgumentException("The boot order contains an entry that is no longer available. Reload first.");
     }
 
     public static void Validate(BootRequest request, BootSnapshot snapshot)

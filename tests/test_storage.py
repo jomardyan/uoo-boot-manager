@@ -8,7 +8,7 @@ import stat
 import tempfile
 import unittest
 
-from uoo.storage import (Store, atomic_write, file_state,
+from uoo.storage import (MAX_RECORD, Store, atomic_write, file_state,
                          read_regular, restore_file, sealed, unseal)
 
 
@@ -110,6 +110,14 @@ class StorageTests(unittest.TestCase):
         for raw in (json.dumps(envelope).encode(), b"not json", b"null", b"[]", b"123", b'{}'):
             with self.subTest(raw=raw), self.assertRaises(RuntimeError):
                 unseal(raw)
+
+    def test_sealed_size_limit_applies_to_the_stored_envelope(self):
+        # Readers cap the file itself, so a record that only fits before wrapping must be refused.
+        record = {"data": "x" * (MAX_RECORD - 80)}
+        with self.assertRaisesRegex(RuntimeError, "too large"):
+            sealed(record)
+        encoded = sealed({"data": "x"})
+        self.assertNotIn(b" ", encoded)
 
     def test_backup_private_permissions_read_and_delete_integrity(self):
         identifier = self.backup()

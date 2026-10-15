@@ -150,6 +150,33 @@ Test("entry deletion preserves manager references beyond display order", () =>
     try { WindowsBootService.ValidateEntryDeletion([manager, recovery], target); } catch (ArgumentException) { recoveryRefused = true; }
     Check(recoveryRefused);
 });
+Test("safe mode values round trip including directory services repair", () =>
+{
+    var loader = DemoBootService.WindowsId;
+    foreach (var (name, value) in new[] { ("Minimal", 0ul), ("Network", 1ul), ("DsRepair", 2ul) })
+    {
+        Check(WindowsBootService.SafeBootValue(name) == value, "Wrote wrong SafeBoot value for " + name);
+        var record = new BcdRecord(loader, Bcd.WindowsLoader, new() { [Bcd.SafeBoot] = value });
+        Check(WindowsBootService.ReadOptions(record).SafeBoot == name, "Read wrong SafeBoot name for " + value);
+    }
+    var shell = new BcdRecord(loader, Bcd.WindowsLoader, new() { [Bcd.SafeBoot] = 0ul, [0x26000081] = true });
+    Check(WindowsBootService.ReadOptions(shell).SafeBoot == "AlternateShell");
+});
+Test("menu verification can be relaxed for exact rollback only", () =>
+{
+    var current = DemoBootService.WindowsId; var other = DemoBootService.OtherWindowsId;
+    var state = new BootSnapshot
+    {
+        Entries = [new() { Id = current, IsCurrent = true, IsWindows = true }, new() { Id = other, IsWindows = true }],
+        Menu = new() { DefaultId = current, Order = [current, other] }
+    };
+    Check(WindowsBootService.Verified(state));
+    var incomplete = state with { Menu = state.Menu with { Order = [other] } };
+    Check(!WindowsBootService.Verified(incomplete) && WindowsBootService.Verified(incomplete, false));
+    var noDefault = state with { Menu = state.Menu with { DefaultId = "" } };
+    Check(!WindowsBootService.Verified(noDefault) && WindowsBootService.Verified(noDefault, false));
+    Check(!WindowsBootService.Verified(state with { Errors = ["unreadable"] }, false));
+});
 if (portable)
 {
     Console.WriteLine($"{passed} portable platform tests passed, {failed} failed");

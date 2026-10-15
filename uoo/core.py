@@ -6,7 +6,16 @@ import re
 import shlex
 
 
-_DECLARATION = re.compile(r"[ \t]*(menuentry|submenu)(?=\s)")
+_DECLARATION = re.compile(r"(menuentry|submenu)(?=\s)")
+_COMMAND_KEYWORD = re.compile(r"(?:^|[\n;{}])[ \t]*(?:then|do|else)$")
+
+
+def _command_start(text, i):
+    """Whether a word at i begins a command (after a newline, ;, {, }, then, do or else)."""
+    j = i
+    while j and text[j - 1] in " \t":
+        j -= 1
+    return not j or text[j - 1] in "\n;{}" or _COMMAND_KEYWORD.search(text, max(0, j - 64), j) is not None
 
 
 @dataclass(frozen=True)
@@ -49,10 +58,10 @@ def _grub_events(text, quote=None, declarations=False):
     i = 0
     while i < len(text):
         char = text[i]
-        if declarations and quote is None and (i == 0 or text[i - 1] == "\n"):
+        if declarations and quote is None and char in "ms":
             match = _DECLARATION.match(text, i)
-            if match:
-                events.append((match.start(1), match[1]))
+            if match and _command_start(text, i):
+                events.append((i, match[1]))
         if char == "\\" and quote != "'":
             i += 2
             continue
@@ -79,11 +88,14 @@ def structural_braces(line, quote=None):
     return _grub_events(line, quote)
 
 
-def _literal_tokens(text, reject_operators=False):
-    """Read shell quoting and continuations while leaving expansions literal."""
+def _literal_tokens(text, reject_operators=False, started=False):
+    """Read shell quoting and continuations while leaving expansions literal.
+
+    started=True reads text that continues a word, such as the value after NAME=,
+    where a leading # is literal rather than a comment.
+    """
     tokens = []
     token = []
-    started = False
     quote = None
     i = 0
     while i < len(text):
@@ -161,15 +173,23 @@ def parse_entries(config):
                 tokens = _literal_tokens(config[pending:offset])
             except ValueError as exc:
                 raise ValueError("Cannot read a GRUB menu declaration.") from exc
-            if len(tokens) < 2 or not tokens[1]:
-                raise ValueError("Incomplete GRUB menu declaration.")
-            kind, title = tokens[:2]
-            entry_id = None
-            for j, token in enumerate(tokens[2:], 2):
+            # GRUB accepts options anywhere; the title is the first argument that is not an option.
+            kind, title, entry_id = tokens[0], None, None
+            j = 1
+            while j < len(tokens):
+                token = tokens[j]
                 if token.startswith("--id="):
                     entry_id = token[5:]
                 elif token in ("--id", "$menuentry_id_option", "${menuentry_id_option}") and j + 1 < len(tokens):
                     entry_id = tokens[j + 1]
+                    j += 1
+                elif token in ("--class", "--users", "--hotkey") and j + 1 < len(tokens):
+                    j += 1
+                elif not token.startswith("--") and title is None:
+                    title = token
+                j += 1
+            if not title:
+                raise ValueError("Incomplete GRUB menu declaration.")
             parent = tuple(frame[2] for frame in frames)
             position = counters.get(parent, 0)
             counters[parent] = position + 1
@@ -211,17 +231,36 @@ def parse_entries(config):
 
 def parse_settings(text):
     settings = {}
-    for line in text.splitlines():
-        match = re.match(r"^\s*(?:export\s+)?(GRUB_[A-Z_]+)\s*=(.*)$", line)
-        if match:
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        # The shell only assigns NAME=value; "NAME =value" or "NAME= cmd" runs a command instead.
+        match = re.match(r"^\s*(?:export\s+)?(GRUB_[A-Z_]+)=(.*)$", lines[i])
+        i += 1
+        if not match:
+            continue
+        value, end = match[2], i
+        while True:
             try:
-                values = _literal_tokens(match[2], reject_operators=True)
-                if len(values) == 1:
-                    settings[match[1]] = values[0]
-                elif not values:
-                    settings[match[1]] = ""
-            except ValueError:
-                continue
+                if value[:1].isspace():
+                    values = None if _literal_tokens(value, reject_operators=True) else [""]
+                else:
+                    values = _literal_tokens(value, reject_operators=True, started=bool(value))
+                break
+            except ValueError as exc:
+                # An open quote or trailing backslash continues the value onto the next line.
+                if end >= len(lines) or str(exc) not in ("Unfinished quote.", "Unfinished escape."):
+                    values = None
+                    break
+                value += "\n" + lines[end]
+                end += 1
+        if values is None:
+            continue
+        i = end
+        if len(values) == 1:
+            settings[match[1]] = values[0]
+        elif not values:
+            settings[match[1]] = ""
     return settings
 
 
@@ -272,7 +311,9 @@ def parse_firmware(text):
 
 
 def override_text(selector, timeout, style):
-    if not isinstance(selector, str) or not selector or len(selector) > 2048 or any(ord(c) < 32 for c in selector):
+    from .models import _SELECTOR
+    # 00_header copies GRUB_DEFAULT into grub.cfg inside double quotes, so shell quoting alone is not enough.
+    if not isinstance(selector, str) or len(selector) > 2048 or not _SELECTOR.fullmatch(selector):
         raise ValueError("Invalid boot entry.")
     if type(timeout) is not int or not -1 <= timeout <= 300:
         raise ValueError("Timeout must be between -1 and 300 seconds.")

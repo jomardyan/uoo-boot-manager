@@ -13,6 +13,9 @@ from .models import (compile_custom_entries, validate_custom_entries,
                      validate_grub_changes, validate_png)
 
 
+GRUB_KEYS = ("grub", "custom_entries", "background", "background_info", "grub_next", "grub_saved", "managed")
+
+
 class DemoManager:
     """Exercise the complete UI safely; all state lasts only for this instance."""
 
@@ -79,18 +82,19 @@ class DemoManager:
         }
         if self._grub.get("GRUB_DEFAULT") == "saved":
             self._state["settings"]["UOO_SAVED_ENTRY"] = self._state["grub_saved"]
-        self._state["entries"] = [asdict(entry) for entry in parse_entries(
-            DEMO_CONFIG + "\n" + compile_custom_entries(self._state["custom_entries"]))]
+        self._state["entries"] = [asdict(entry) for entry in self._menu()]
+
+    def _menu(self, custom=None):
+        return parse_entries(DEMO_CONFIG + "\n" + compile_custom_entries(
+            self._state["custom_entries"] if custom is None else custom))
 
     def _configuration(self):
         return {"grub": copy.deepcopy(self._grub), "custom_entries": copy.deepcopy(self._state["custom_entries"]),
                 "firmware": copy.deepcopy(self._state["firmware"])}
 
-    def _grub_state(self):
-        return {"grub": copy.deepcopy(self._grub), **{
-            key: copy.deepcopy(self._state[key]) for key in
-            ("custom_entries", "background", "background_info", "grub_next", "grub_saved", "managed")
-        }}
+    def _grub_state(self, keys=GRUB_KEYS):
+        """Copy only the GRUB pieces a real backup of the same action captures."""
+        return {key: copy.deepcopy(self._grub if key == "grub" else self._state[key]) for key in keys}
 
     def _entry_spec(self, entry):
         spec = copy.deepcopy(self._specifications[entry["id"]])
@@ -122,13 +126,14 @@ class DemoManager:
             raise ValueError("The demo backup does not exist.")
         return record
 
-    def _valid_selector(self, entry, custom=None, allow_saved=False):
-        entries = [asdict(item) for item in parse_entries(DEMO_CONFIG)]
-        entries.extend(asdict(item) for item in parse_entries(compile_custom_entries(
-            self._state["custom_entries"] if custom is None else custom)))
-        selectors = {item["selector"] for item in entries}
-        if type(entry) is not str or (entry not in selectors and not (allow_saved and entry == "saved")):
+    def _valid_selector(self, entry, custom=None, allow_saved=False, positions=False):
+        # GRUB_DEFAULT may also be a menu position such as "0" or "1>0"; one-time choices may not.
+        known = {value for item in self._menu(custom) for value in (item.selector, item.position)[:2 if positions else 1]}
+        if type(entry) is not str or (entry not in known and not (allow_saved and entry == "saved")):
             raise ValueError("Choose an existing GRUB boot entry.")
+
+    def _resolve(self, value):
+        return next((item.selector for item in self._menu() if item.position == value), value)
 
     def _firmware_entry(self, identifier):
         if type(identifier) is not str:
@@ -200,8 +205,22 @@ class DemoManager:
         if "next" in old:
             if old["next"] and old["next"] not in inventory:
                 raise ValueError("The saved one-time firmware entry no longer exists.")
+            if old["next"] and not inventory[old["next"]]["active"]:
+                raise ValueError("A backup cannot schedule an inactive firmware entry for the next boot.")
             current["next"] = old["next"]
         return current, specifications
+
+    def _rollback_target(self, old):
+        """Like the real helper: the current inventory, removing entries the restore recreates."""
+        before = copy.deepcopy(self._state["firmware"])
+        known = {entry["id"] for entry in before["entries"]}
+        candidates = dict(old.get("restore_specs", {}))
+        if "recreate" in old:
+            candidates[old["recreate"]["id"]] = old["recreate"]["spec"]
+        created = {identifier: copy.deepcopy(spec) for identifier, spec in candidates.items() if identifier not in known}
+        if created:
+            before.update(remove=sorted(created), remove_specs=created)
+        return before
 
     @staticmethod
     def _validate_envelope(data):
@@ -282,9 +301,13 @@ class DemoManager:
                 changes = validate_grub_changes({"GRUB_DEFAULT": request.get("entry"),
                                                 "GRUB_TIMEOUT": request.get("timeout"),
                                                 "GRUB_TIMEOUT_STYLE": request.get("style"), "GRUB_SAVEDEFAULT": False})
+            if not changes:
+                raise ValueError("No GRUB setting changes were supplied.")
             merged = {**self._grub, **changes}
-            self._valid_selector(merged["GRUB_DEFAULT"], allow_saved=True)
-            self._backup("grub", "GRUB settings before applying changes", self._grub_state())
+            if merged["GRUB_SAVEDEFAULT"]:
+                merged["GRUB_DEFAULT"] = "saved"
+            self._valid_selector(merged["GRUB_DEFAULT"], allow_saved=True, positions=True)
+            self._backup("grub", "GRUB settings before applying changes", self._grub_state(("grub", "managed")))
             self._grub = merged
             self._state["managed"] = True
             message = "Demo GRUB settings applied."
@@ -296,23 +319,22 @@ class DemoManager:
             self._state["grub_next"] = entry
             message = "Demo GRUB one-time choice updated."
         elif action == "refresh_grub":
-            self._backup("grub", "GRUB configuration before rebuilding", self._grub_state())
+            self._backup("grub", "GRUB configuration before rebuilding", {})
             message = "Demo GRUB menu rebuilt."
         elif action == "custom_entries":
             custom = validate_custom_entries(request.get("entries"))
-            self._valid_selector(self._grub["GRUB_DEFAULT"], custom, allow_saved=True)
+            self._valid_selector(self._resolve(self._grub["GRUB_DEFAULT"]), custom, allow_saved=True)
             if self._state["grub_next"]:
                 self._valid_selector(self._state["grub_next"], custom)
             if self._grub["GRUB_DEFAULT"] == "saved":
-                self._valid_selector(self._state["grub_saved"], custom)
-            self._backup("grub", "Custom entries before changing them", self._grub_state())
+                self._valid_selector(self._resolve(self._state["grub_saved"]), custom)
+            self._backup("grub", "Custom entries before changing them", self._grub_state(("custom_entries",)))
             self._state["custom_entries"] = custom
-            self._state["managed"] = True
             message = "Demo custom entries applied."
         elif action == "apply_order":
             order = request.get("order")
             self._valid_order(order)
-            self._backup("uefi_order", "UEFI boot order before changing it", {"order": self._state["firmware"]["order"]})
+            self._backup("uefi_order", "UEFI boot order before changing it", {"firmware": {"order": self._state["firmware"]["order"]}})
             self._state["firmware"]["order"] = list(order)
             message = "Demo firmware boot order saved."
         elif action == "next_boot":
@@ -323,7 +345,7 @@ class DemoManager:
             if self._state["firmware"]["next"] == entry:
                 message = "The requested demo one-time boot choice is already in place."
             else:
-                self._backup("next_boot", "UEFI one-time choice before changing it", {"next": self._state["firmware"]["next"]})
+                self._backup("next_boot", "UEFI one-time choice before changing it", {"firmware": {"next": self._state["firmware"]["next"]}})
                 self._state["firmware"]["next"] = entry
                 message = "Demo firmware one-time choice updated."
         elif action == "set_active":
@@ -341,10 +363,15 @@ class DemoManager:
             entry["active"] = active
             message = "Demo firmware entry state updated."
         elif action == "create_uefi":
+            label, loader = request.get("label"), request.get("loader")
+            if (type(label) is not str or not label.strip() or label != label.strip() or len(label) > 120
+                    or any(ord(char) < 32 for char in label)):
+                raise ValueError("Use a nonempty firmware label of at most 120 characters.")
             if request.get("disk") != "/dev/sda" or type(request.get("partition")) is not int or request["partition"] != 1:
                 raise ValueError("Choose the demo EFI partition /dev/sda1.")
-            validate_custom_entries([{"id": "uoo-" + "0" * 32, "title": request.get("label"),
-                                     "type": "efi", "enabled": True, "uuid": "ABCD-1234", "loader": request.get("loader")}])
+            if (type(loader) is not str or not re.fullmatch(r"/EFI/[A-Za-z0-9_ .+@/-]+\.efi", loader, re.I)
+                    or any(part in ("", ".", "..") for part in loader.split("/")[1:]) or len(loader) > 512):
+                raise ValueError("Use an absolute /EFI/... .efi loader path without traversal.")
             firmware = self._state["firmware"]
             used = {entry["id"] for entry in firmware["entries"]}
             identifier = next((f"{number:04X}" for number in range(65536) if f"{number:04X}" not in used), None)
@@ -383,12 +410,15 @@ class DemoManager:
             except (ValueError, binascii.Error) as exc:
                 raise ValueError("Background PNG encoding is invalid.") from exc
             width, height = validate_png(image)
-            self._backup("grub", "GRUB appearance before changing its background", self._grub_state())
-            self._state["background"] = True
+            self._backup("grub", "GRUB appearance before changing its background",
+                         self._grub_state(("grub", "managed", "background", "background_info")))
+            self._state["managed"] = self._state["background"] = True
             self._state["background_info"] = {"width": width, "height": height, "path": "/boot/grub/uoo-background.png"}
             message = "Demo background applied."
         elif action == "clear_background":
-            self._backup("grub", "GRUB appearance before clearing its background", self._grub_state())
+            self._backup("grub", "GRUB appearance before clearing its background",
+                         self._grub_state(("grub", "managed", "background", "background_info")))
+            self._state["managed"] = True
             self._state["background"] = False
             self._state["background_info"] = {}
             message = "Demo background cleared."
@@ -416,40 +446,29 @@ class DemoManager:
                 message = "Demo backup deleted."
             else:
                 data = record["data"]
+                pieces = tuple(key for key in GRUB_KEYS if key in data)
                 firmware = None
                 specifications = None
                 if "firmware" in data:
                     firmware, specifications = self._restore_firmware(data["firmware"])
-                elif "order" in data:
-                    firmware = copy.deepcopy(self._state["firmware"])
-                    firmware["order"] = data["order"] + [item for item in firmware["order"] if item not in data["order"]]
-                    self._valid_order(firmware["order"], firmware)
-                elif "next" in data:
-                    if data["next"]:
-                        self._firmware_entry(data["next"])
-                    firmware = copy.deepcopy(self._state["firmware"])
-                    firmware["next"] = data["next"]
-                if "grub" in data:
-                    self._valid_selector(data["grub"]["GRUB_DEFAULT"], data["custom_entries"], allow_saved=True)
-                if "grub_next" in data and data["grub_next"]:
-                    self._valid_selector(data["grub_next"], data.get("custom_entries"))
-                current = self._grub_state() if "grub" in data else {}
+                if pieces:
+                    after = {**self._grub_state(), **data}
+                    default = after["grub"]["GRUB_DEFAULT"]
+                    self._valid_selector((after["grub_saved"] or "0") if default == "saved" else default,
+                                         after["custom_entries"], positions=True)
+                    if after["grub_next"]:
+                        self._valid_selector(after["grub_next"], after["custom_entries"])
+                current = self._grub_state(pieces)
                 if firmware is not None:
-                    current["firmware"] = self._firmware_state()
-                if set(data) == {"order"}:
-                    current = {"order": self._state["firmware"]["order"]}
-                elif set(data) == {"next"}:
-                    current = {"next": self._state["firmware"]["next"]}
-                if set(data) == {"grub_next"}:
-                    current = {"grub_next": self._state["grub_next"]}
-                self._backup(record["kind"], "Current demo configuration before restoring a backup", current)
-                if "grub" in data:
-                    self._grub = copy.deepcopy(data["grub"])
-                    for key, value in data.items():
-                        if key not in ("grub", "firmware"):
-                            self._state[key] = copy.deepcopy(value)
-                elif "grub_next" in data:
-                    self._state["grub_next"] = data["grub_next"]
+                    current["firmware"] = self._rollback_target(data["firmware"])
+                # Firmware-only restores snapshot the firmware as "uefi"; file restores reuse the backup's kind.
+                kind = "uefi" if firmware is not None and not pieces else record["kind"]
+                self._backup(kind, "Current demo configuration before restoring a backup", current)
+                for key in pieces:
+                    if key == "grub":
+                        self._grub = copy.deepcopy(data["grub"])
+                    else:
+                        self._state[key] = copy.deepcopy(data[key])
                 if firmware is not None:
                     self._state["firmware"] = firmware
                     if specifications is not None:
@@ -458,10 +477,11 @@ class DemoManager:
         elif action == "import_configuration":
             grub, custom = self._validate_envelope(request.get("data"))
             merged = {**self._grub, **grub}
-            self._valid_selector(merged["GRUB_DEFAULT"], custom, allow_saved=True)
+            self._valid_selector(merged["GRUB_DEFAULT"], custom, allow_saved=True, positions=True)
             if merged["GRUB_DEFAULT"] == "saved":
                 self._valid_selector(self._state["grub_saved"], custom)
-            self._backup("grub", "GRUB configuration before importing settings", self._grub_state())
+            self._backup("grub", "GRUB configuration before importing settings",
+                         self._grub_state(("grub", "custom_entries", "managed")))
             self._grub = merged
             self._state["custom_entries"] = custom
             if self._state["grub_next"]:
@@ -477,8 +497,8 @@ class DemoManager:
         elif action == "repair":
             if request.get("plan") != "demo-repair" or request.get("confirm") != "/boot/efi":
                 raise ValueError("Inspect the demo repair plan and confirm /boot/efi exactly.")
-            self._backup("all", "Configuration before simulated EFI repair",
-                         {**self._grub_state(), "firmware": self._firmware_state()})
+            # The real backup holds only EFI loader files and the regenerated menu, which the demo does not model.
+            self._backup("uefi_repair", "Ubuntu EFI loaders before simulated reinstallation", {})
             message = "Demo bootloader repair completed. No restart was performed."
         self._sync()
         return copy.deepcopy({"ok": True, "snapshot": self._state, "backups": self._metadata(),

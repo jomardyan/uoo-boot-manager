@@ -77,7 +77,9 @@ public sealed partial class MainWindow : Window
     internal async Task RefreshAsync()
     {
         if (busy || !ConfirmDiscard()) return;
-        await ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect }, false, false);
+        // A complete view came from the administrator helper; reading it again unelevated would hide it.
+        var elevated = !demo && snapshot is { RequiresAdministrator: false };
+        await ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect, Confirmation = elevated ? "ADMIN" : "" }, false, false);
     }
 
     private void Navigation_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -102,7 +104,9 @@ public sealed partial class MainWindow : Window
     }
     private void OnClosing(object? sender, CancelEventArgs e)
     {
-        if (!AllowClose && !ConfirmDiscard()) e.Cancel = true;
+        if (AllowClose || ConfirmDiscard()) return;
+        e.Cancel = true;
+        if (busy) StatusText.Text = "Wait for the current operation to finish before closing Uoo.";
     }
 
     private bool Confirm(string title, string summary, string? required, bool recovery, out bool acknowledged)
@@ -134,6 +138,13 @@ public sealed partial class MainWindow : Window
             var response = await Task.Run(() => service.ExecuteAsync(request));
             if (!response.Success || response.Snapshot is null)
             {
+                // A failed change can still report the settings that are now saved (recovery or rollback).
+                if (response.Snapshot is { } current && snapshot is not null && pages.Count > 0)
+                {
+                    var changed = current.Revision != snapshot.Revision;
+                    snapshot = current;
+                    if (changed) RenderSnapshot(); else RefreshMetadata();
+                }
                 ShowError(string.IsNullOrWhiteSpace(response.Message) ? "The operation did not complete. Your unapplied changes are still available." : response.Message);
                 return false;
             }

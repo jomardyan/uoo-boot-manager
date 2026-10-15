@@ -114,13 +114,14 @@ class Repair:
                     raise ValueError("Mount the current EFI System Partition at the expected /boot/efi location before reinstalling.")
                 if "ro" in mount.get("options", "").split(","):
                     raise ValueError("The EFI System Partition is mounted read-only; repair requires a writable mount.")
+                # shimx64.efi.signed follows the administrator's update-alternatives choice, as grub-install does.
                 sources = {
-                    "efi_shim": Path("/usr/lib/shim/shimx64.efi.signed.latest"),
+                    "efi_shim": Path("/usr/lib/shim/shimx64.efi.signed"),
                     "efi_grub": Path("/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed"),
                     "efi_mm": Path("/usr/lib/shim/mmx64.efi"),
                 }
                 if not sources["efi_shim"].exists():
-                    sources["efi_shim"] = Path("/usr/lib/shim/shimx64.efi.signed")
+                    sources["efi_shim"] = Path("/usr/lib/shim/shimx64.efi.signed.latest")
                 sources = {key: source.resolve() for key, source in sources.items()}
                 hashes = {}
                 for key, path in sources.items():

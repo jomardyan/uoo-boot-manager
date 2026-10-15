@@ -82,6 +82,7 @@ class BootWindow(Adw.ApplicationWindow):
         self.closed = False
         self.installed = False if self.demo else trusted_helper_available()
         self.baseline = None
+        self.grub_baseline = {}
         self.confirm_handler = None
         self.error_handler = None
         self.last_dialog = None
@@ -388,6 +389,10 @@ class BootWindow(Adw.ApplicationWindow):
             self.spinner.stop()
             try:
                 if error:
+                    if not self.snapshot:
+                        # The first read failed; replace the initial "Reading…" banner.
+                        self.banner.set_title("The boot configuration could not be read")
+                        self.banner.set_button_label("Diagnostics")
                     self.show_error("Uoo Boot Manager", error)
                 else:
                     callback(result)
@@ -470,7 +475,7 @@ class BootWindow(Adw.ApplicationWindow):
     @staticmethod
     def _bool(settings, key, default=False):
         value = settings.get(key, default)
-        return value is True or str(value).lower() in ("true", "yes", "1")
+        return value is True or value == "true"
 
     def _loaded(self, snapshot):
         self.snapshot = snapshot
@@ -511,7 +516,9 @@ class BootWindow(Adw.ApplicationWindow):
         defaults = {"GRUB_GFXMODE": "auto", "GRUB_COLOR_NORMAL": "light-gray/black", "GRUB_COLOR_HIGHLIGHT": "white/blue"}
         for key, widget in self.fields.items():
             widget.set_text(str(settings.get(key, defaults.get(key, ""))))
-        ui.set_combo(self.payload, settings.get("GRUB_GFXPAYLOAD_LINUX", "keep"))
+        # An unlisted value such as 1024x768 shows as "keep" and is only replaced if the user changes it.
+        payload = settings.get("GRUB_GFXPAYLOAD_LINUX", "keep")
+        ui.set_combo(self.payload, payload if payload in self.payload._choices else "keep")
         self.os_probe.set_active(not self._bool(settings, "GRUB_DISABLE_OS_PROBER", True))
         self.recovery_enabled.set_active(not self._bool(settings, "GRUB_DISABLE_RECOVERY"))
         self.background_row.set_title("A managed background PNG is installed" if self.snapshot.get("background") else "No managed background PNG")
@@ -537,6 +544,7 @@ class BootWindow(Adw.ApplicationWindow):
             self.banner.set_button_label("")
         self._rendering = False
         self.baseline = self._draft()
+        self.grub_baseline = {**self._advanced_changes(), **self._appearance_changes()}
         self._controls()
 
     def _selected(self, widget):
@@ -605,7 +613,7 @@ class BootWindow(Adw.ApplicationWindow):
             self.buttons[name].set_sensitive(firmware)
         self.buttons["firmware_up"].set_sensitive(firmware and index > 0)
         self.buttons["firmware_down"].set_sensitive(firmware and 0 <= index < len(self.order) - 1)
-        self.buttons["firmware_include"].set_sensitive(firmware and entry is not None and entry["id"] in known)
+        self.buttons["firmware_include"].set_sensitive(firmware and entry is not None and (entry["id"] in known or entry["id"] in self.order))
         self.buttons["firmware_next"].set_sensitive(firmware and bool(self.snapshot.get("firmware", {}).get("next") or entry and entry.get("active", True)))
         self.buttons["order_apply"].set_sensitive(firmware and bool(self.order) and set(self.order) <= known and self.order != self.snapshot.get("firmware", {}).get("order", []))
         custom = self._selected(self.custom_list)
@@ -635,18 +643,30 @@ class BootWindow(Adw.ApplicationWindow):
         self._mutate({"action": "apply_grub", "changes": changes}, "Apply boot settings",
                      f"Default: {title}\nTimeout: {changes['GRUB_TIMEOUT']} seconds\nAppearance: {ui.combo_value(self.menu_style)}")
 
-    def apply_advanced(self):
+    def _advanced_changes(self):
         changes = {key: self.fields[key].get_text() for key in ("GRUB_CMDLINE_LINUX_DEFAULT", "GRUB_CMDLINE_LINUX")}
         changes.update(GRUB_RECORDFAIL_TIMEOUT=self.recordfail_timeout.get_value_as_int(),
                        GRUB_DISABLE_OS_PROBER=not self.os_probe.get_active(), GRUB_DISABLE_RECOVERY=not self.recovery_enabled.get_active())
-        self._apply_changes(changes, "Apply advanced options")
+        return changes
 
-    def apply_appearance(self):
+    def _appearance_changes(self):
         changes = {key: self.fields[key].get_text() for key in ("GRUB_GFXMODE", "GRUB_COLOR_NORMAL", "GRUB_COLOR_HIGHLIGHT")}
         changes.update(GRUB_GFXPAYLOAD_LINUX=ui.combo_value(self.payload), GRUB_TIMEOUT_STYLE=STYLE_VALUES[self.appearance_style.get_selected()])
-        self._apply_changes(changes, "Apply appearance")
+        return changes
+
+    def apply_advanced(self):
+        self._apply_changes(self._advanced_changes(), "Apply advanced options")
+
+    def apply_appearance(self):
+        self._apply_changes(self._appearance_changes(), "Apply appearance")
 
     def _apply_changes(self, changes, title):
+        # Send only edited keys, so a value the form could not show exactly (for example a
+        # multi-line kernel command line) is never overwritten by its displayed approximation.
+        changes = {key: value for key, value in changes.items() if self.grub_baseline.get(key) != value}
+        if not changes:
+            self._status("There are no changes to apply.")
+            return
         try:
             validate_grub_changes(changes)
         except ValueError as exc:
@@ -842,7 +862,8 @@ class BootWindow(Adw.ApplicationWindow):
 
         def chosen(name):
             try:
-                relative = Path(name).resolve().relative_to(Path(mount).resolve())
+                # Keep a chosen symlink such as /boot/vmlinuz so the entry follows kernel updates.
+                relative = (Path(name).parent.resolve() / Path(name).name).relative_to(Path(mount).resolve())
             except ValueError:
                 self.show_error("Different filesystem", "Choose a file beneath the selected filesystem's mount point.", parent=parent)
                 return
@@ -1045,7 +1066,11 @@ class BootWindow(Adw.ApplicationWindow):
             except (OSError, ValueError) as exc:
                 self.show_error("Cannot import", exc)
                 return
-            summary = f"Import GRUB settings and {len(data['configuration'].get('custom_entries', []))} managed entries from {source.name}.\nFirmware entries are not imported. The helper validates the full configuration before applying it."
+            entries = data["configuration"].get("custom_entries", [])
+            if not isinstance(entries, list):
+                self.show_error("Cannot import", "Choose a version 1 Uoo configuration export.")
+                return
+            summary = f"Import GRUB settings and {len(entries)} managed entries from {source.name}.\nFirmware entries are not imported. The helper validates the full configuration before applying it."
             self._mutate({"action": "import_configuration", "data": data}, "Import portable configuration", summary, "Import")
 
         chosen(path) if path else ui.file_dialog(self, "Import a Uoo configuration", False, chosen, "*.json")

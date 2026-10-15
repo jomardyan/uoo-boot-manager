@@ -92,7 +92,7 @@ public partial class MainWindow
         entryActions.Children.Add(renameEntry); entryActions.Children.Add(copyEntry); entryActions.Children.Add(deleteEntry);
         entryActions.Children.Add(Ui.Button("Use for next boot", async () => await SetOnceAsync(false, false)));
         entryCard.Children.Add(entryActions); page.Children.Add(Ui.Card("Selected entry", entryCard));
-        safeBoot = new ComboBox { ItemsSource = new[] { "Off", "Minimal", "Network", "AlternateShell" } };
+        safeBoot = new ComboBox { ItemsSource = new[] { "Off", "Minimal", "Network", "AlternateShell", "DsRepair" } };
         menuPolicy = new ComboBox { ItemsSource = new[] { "Standard", "Legacy" } };
         bootLog = new CheckBox { Content = "Write a boot log (ntbtlog.txt)", Margin = new Thickness(0, 6, 0, 8) };
         sos = new CheckBox { Content = "Show driver names while starting", Margin = new Thickness(0, 6, 0, 8) };
@@ -100,7 +100,7 @@ public partial class MainWindow
         recovery = new CheckBox { Content = "Enable Windows recovery", Margin = new Thickness(0, 6, 0, 8) };
         FillOptions(selectedEntry?.Options ?? new BootEntryOptions());
         var options = new StackPanel(); Ui.Field(options, "Safe mode", safeBoot);
-        options.Children.Add(Ui.Text("Minimal starts basic Windows services. Network also enables networking. AlternateShell starts a command prompt.", margin: new Thickness(0, 0, 0, 12)));
+        options.Children.Add(Ui.Text("Minimal starts basic Windows services. Network also enables networking. AlternateShell starts a command prompt. DsRepair starts Directory Services Repair Mode on a domain controller.", margin: new Thickness(0, 0, 0, 12)));
         options.Children.Add(bootLog); options.Children.Add(sos); options.Children.Add(baseVideo); options.Children.Add(recovery);
         Ui.Field(options, "Boot menu style", menuPolicy); page.Children.Add(Ui.Card("Advanced startup", options));
         var apply = Ui.WrapActions(); var applyButton = Ui.Button("Apply entry options", async () => await ApplyOptionsAsync(), true); applyButton.IsEnabled = selectedEntry is not null;

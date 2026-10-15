@@ -16,20 +16,21 @@ public sealed partial class App : Application
             var inspect = Array.IndexOf(e.Args, "--inspect-test");
             if (inspect >= 0)
             {
-                if (inspect + 1 >= e.Args.Length) throw new ArgumentException("--inspect-test requires an output file.");
+                if (inspect + 1 >= e.Args.Length || e.Args[inspect + 1].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("--inspect-test requires an output file.");
                 var response = await new ElevatedBootService().ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect, Confirmation = "ADMIN" });
                 await File.WriteAllTextAsync(e.Args[inspect + 1], JsonSerializer.Serialize(response, BootJson.Options));
                 Shutdown(response.Success && response.Snapshot is not null ? 0 : 1);
                 return;
             }
             var smoke = Array.IndexOf(e.Args, "--smoke-test");
+            if (smoke >= 0 && (smoke + 1 >= e.Args.Length || e.Args[smoke + 1].StartsWith("--", StringComparison.Ordinal)))
+                throw new ArgumentException("--smoke-test requires an output directory.");
             var demo = smoke >= 0 || e.Args.Contains("--demo");
             var window = MakeWindow(demo);
             MainWindow = window;
             window.Show();
             if (smoke >= 0)
             {
-                if (smoke + 1 >= e.Args.Length) throw new ArgumentException("--smoke-test requires an output directory.");
                 await window.LoadAsync();
                 await SmokeRunner.RunAsync(window, e.Args[smoke + 1]);
                 Shutdown(0);
@@ -57,10 +58,14 @@ public sealed partial class App : Application
         {
             if (!window.ConfirmDiscard()) return;
             var replacement = MakeWindow(!window.IsDemo);
-            replacement.Left = window.Left;
-            replacement.Top = window.Top;
-            replacement.Width = window.Width;
-            replacement.Height = window.Height;
+            // RestoreBounds keeps the normal size of a maximized window; Manual stops CenterScreen moving it.
+            var bounds = window.WindowState == WindowState.Normal ? new Rect(window.Left, window.Top, window.Width, window.Height) : window.RestoreBounds;
+            replacement.WindowStartupLocation = WindowStartupLocation.Manual;
+            replacement.Left = bounds.Left;
+            replacement.Top = bounds.Top;
+            replacement.Width = bounds.Width;
+            replacement.Height = bounds.Height;
+            replacement.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
             MainWindow = replacement;
             window.AllowClose = true;
             replacement.Show();

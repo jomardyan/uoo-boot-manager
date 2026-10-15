@@ -23,9 +23,10 @@ def typed_settings(settings):
             if key in ("GRUB_TIMEOUT", "GRUB_RECORDFAIL_TIMEOUT"):
                 value = int(value)
             elif key in ("GRUB_SAVEDEFAULT", "GRUB_DISABLE_OS_PROBER", "GRUB_DISABLE_RECOVERY"):
-                if str(value).lower() not in ("true", "false"):
+                # GRUB's scripts compare against the exact string "true" ("TRUE" does nothing).
+                if value not in ("true", "false"):
                     continue
-                value = str(value).lower() == "true"
+                value = value == "true"
             valid.update(validate_grub_changes({key: value}))
         except (ValueError, TypeError):
             continue

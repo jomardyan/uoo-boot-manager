@@ -1,6 +1,6 @@
 # Publish Uoo Boot Manager in the Microsoft Store
 
-Maintainer instructions for the Windows 11 edition. Examples use **2.2.0**;
+Maintainer instructions for the Windows 11 edition. Examples use **2.2.1**;
 replace versions, certificate thumbprints, timestamp services, download hosts,
 and account details with your release values.
 
@@ -136,7 +136,7 @@ $payload = (Resolve-Path 'build/windows/win-x64/payload').Path
 $output = Join-Path $PWD 'dist/windows-store'
 New-Item $output -ItemType Directory -Force | Out-Null
 $signCommand = 'signtool.exe sign /sha1 YOUR_CERTIFICATE_THUMBPRINT /fd SHA256 /tr https://YOUR_RFC3161_TIMESTAMP_SERVICE /td SHA256 $f'
-& $compiler "/SstoreSign=$signCommand" '/DAppVersion=2.2.0' '/DCpuArch=x64' "/DPayloadDir=$payload" "/DOutputDir=$output" 'windows/packaging/uoo.iss'
+& $compiler "/SstoreSign=$signCommand" '/DAppVersion=2.2.1' '/DCpuArch=x64' "/DPayloadDir=$payload" "/DOutputDir=$output" 'windows/packaging/uoo.iss'
 if ($LASTEXITCODE -ne 0) { throw 'Signed installer build failed.' }
 ```
 
@@ -158,7 +158,7 @@ installer in its normal interactive mode and with these Store parameters:
 Example for a disposable x64 test system:
 
 ```powershell
-$installer = (Resolve-Path 'dist/windows-store/Uoo-Boot-Manager-2.2.0-windows-x64-setup.exe').Path
+$installer = (Resolve-Path 'dist/windows-store/Uoo-Boot-Manager-2.2.1-windows-x64-setup.exe').Path
 $install = Start-Process -FilePath $installer -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -PassThru
 if ($install.ExitCode -ne 0) { throw "Install failed with exit code $($install.ExitCode)" }
 & 'C:\Program Files\Uoo Boot Manager\Uoo.BootManager.exe' --demo
@@ -185,8 +185,8 @@ Provide a direct public HTTPS download for each signed EXE. Use immutable,
 version-specific paths, for example:
 
 ```text
-https://YOUR_DOWNLOAD_HOST/uoo/2.2.0/Uoo-Boot-Manager-2.2.0-windows-x64-setup.exe
-https://YOUR_DOWNLOAD_HOST/uoo/2.2.0/Uoo-Boot-Manager-2.2.0-windows-arm64-setup.exe
+https://YOUR_DOWNLOAD_HOST/uoo/2.2.1/Uoo-Boot-Manager-2.2.1-windows-x64-setup.exe
+https://YOUR_DOWNLOAD_HOST/uoo/2.2.1/Uoo-Boot-Manager-2.2.1-windows-arm64-setup.exe
 ```
 
 A draft GitHub release, Actions artifact, authenticated link, temporary signed

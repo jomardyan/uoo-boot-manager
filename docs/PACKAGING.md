@@ -67,9 +67,9 @@ For custom boot entries in Flatpak, enter filesystem-relative boot paths
 manually; other file choices use the desktop portal.
 
 ```sh
-flatpak install --user ./uoo-boot-manager-2.2.0-x86_64.flatpak
+flatpak install --user ./uoo-boot-manager-2.2.1-x86_64.flatpak
 flatpak run org.uoo.BootManager
-sudo snap install --dangerous --classic ./uoo-boot-manager_2.2.0_amd64.snap
+sudo snap install --dangerous --classic ./uoo-boot-manager_2.2.1_amd64.snap
 uoo-boot-manager
 ```
 
@@ -115,7 +115,7 @@ Set the same three-part version in `uoo/__init__.py`, `packaging/control`,
 `windows/Directory.Build.props`, `windows/packaging/uoo.iss`, the
 `debian/changelog` entry, and a new `<release>` entry in
 `packaging/org.uoo.BootManager.metainfo.xml`. Use the four-part form (for
-example `2.2.0.0`) in `windows/Uoo.Desktop/app.manifest` and
+example `2.2.1.0`) in `windows/Uoo.Desktop/app.manifest` and
 `windows/Uoo.Helper/app.manifest`. Also update the version shown by the
 website (`website/index.html` and `website/app.js`) and the README badge.
 `tests/test_packaging.py` checks that the Windows props, manifests, Inno Setup
@@ -123,11 +123,11 @@ script, metainfo release, and changelog match the package version. Commit the
 release sources, then push the matching tag:
 
 ```sh
-git tag v2.2.0
-git push origin v2.2.0
+git tag v2.2.1
+git push origin v2.2.1
 ```
 
-Alternatively, push a commit on `main` whose first line is `release: v2.2.0`
+Alternatively, push a commit on `main` whose first line is `release: v2.2.1`
 after synchronizing those version files. **Create requested release tag**
 checks the requested version, creates the tag at that exact commit, and
 dispatches both package workflows on it. It refuses to move an existing tag
@@ -139,7 +139,7 @@ complete package set, downloads every asset, verifies both SHA256 manifests,
 and then publishes the release with the checked-in versioned release notes.
 Directly pushed tags still create drafts for manual publication.
 To publish a release whose tag already exists, push a commit on `main` whose
-first line is `publish: v2.2.0`, or run **Publish an existing verified
+first line is `publish: v2.2.1`, or run **Publish an existing verified
 release** (`publish-release.yml`) manually with that version; it verifies the
 packages from the existing tag and publishes them with its release notes.
 
@@ -298,7 +298,7 @@ Build an Arch package as an ordinary user on Arch with `dpkg`, `base-devel`,
 Python, and zstd installed:
 
 ```sh
-bash scripts/build-arch.sh dist/uoo-boot-manager_2.2.0_all.deb
+bash scripts/build-arch.sh dist/uoo-boot-manager_2.2.1_all.deb
 ```
 
 Flatpak builds require `flatpak-builder` plus the GNOME 50 platform and SDK in
@@ -308,7 +308,7 @@ and a matching-architecture AppImage:
 ```sh
 flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
 bash scripts/build-flatpak.sh
-bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.2.0-x86_64.AppImage
+bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.2.1-x86_64.AppImage
 ```
 
 Snapcraft's destructive mode installs its build prerequisites on the build
@@ -318,5 +318,5 @@ modify boot settings. To run an AppImage where FUSE is unavailable:
 
 ```sh
 chmod +x dist/*.AppImage
-APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.2.0-x86_64.AppImage --demo
+APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.2.1-x86_64.AppImage --demo
 ```

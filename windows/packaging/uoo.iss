@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "2.2.0"
+  #define AppVersion "2.2.1"
 #endif
 #ifndef PayloadDir
   #error PayloadDir must point to a validated self-contained publish directory

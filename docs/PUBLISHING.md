@@ -1,7 +1,7 @@
 # Publish Uoo on Ubuntu: APT, Snap, and App Center
 
 Maintainer instructions for distributing Uoo Boot Manager. Examples use app
-version **2.2.0**, Ubuntu **24.04 LTS (`noble`)**, and **26.04 LTS (`resolute`)**. Replace versions, account
+version **2.2.1**, Ubuntu **24.04 LTS (`noble`)**, and **26.04 LTS (`resolute`)**. Replace versions, account
 names, signing-key fingerprints, and revision numbers with your own values.
 
 This guide documents publication; the repository's build workflows do not
@@ -127,8 +127,8 @@ Launchpad requires a source package rather than the binary `.deb` from
 `changelog`, `rules`, `copyright`, and `source/format`. Its debhelper rules reuse
 the binary builder's staging operation and retain the protected helper paths.
 
-The initial PPA revision is **2.2.0-0ppa1~noble1**, with changelog suite
-**noble**. The app itself remains version **2.2.0**. The configured maintainer
+The prepared PPA revision is **2.2.1-0ppa1~noble1**, with changelog suite
+**noble**. The app itself remains version **2.2.1**. The configured maintainer
 is Hayk Jomardyan and the upload target in these examples is **mastercrypt/uoo**.
 Use your own identity/archive when adapting the packaging for another account.
 
@@ -172,12 +172,12 @@ already uploaded upstream source archive:
 
 ```sh
 python3 scripts/build-ppa-source.py --all-supported --revision 2 \
-  --orig dist/ppa/uoo-boot-manager_2.2.0.orig.tar.gz \
+  --orig dist/ppa/uoo-boot-manager_2.2.1.orig.tar.gz \
   --output dist/ppa-universal
 ```
 
 Each suite gets its own directory and package version, such as
-`dist/ppa-universal/resolute/uoo-boot-manager_2.2.0-0ppa1~resolute2_source.changes`.
+`dist/ppa-universal/resolute/uoo-boot-manager_2.2.1-0ppa1~resolute2_source.changes`.
 The upstream `.orig.tar.gz` stays byte-identical across all targets. You can
 select a subset with `--series noble resolute` instead of `--all-supported`.
 
@@ -201,7 +201,7 @@ bundle with the full fingerprint of the key validated on Launchpad:
 
 ```sh
 debsign -k096689AA98D70F17209D36EE61902E85BBCF9FD0 \
-  dist/ppa/uoo-boot-manager_2.2.0-0ppa1~noble1_source.changes
+  dist/ppa/uoo-boot-manager_2.2.1-0ppa1~noble1_source.changes
 ```
 
 Enter your key's passphrase in GnuPG's prompt. `debsign` signs the associated
@@ -209,7 +209,7 @@ source metadata and updates the upload checksums. Then upload:
 
 ```sh
 dput ppa:mastercrypt/uoo \
-  dist/ppa/uoo-boot-manager_2.2.0-0ppa1~noble1_source.changes
+  dist/ppa/uoo-boot-manager_2.2.1-0ppa1~noble1_source.changes
 ```
 
 Keep all bundle files together. Uploading `_source.changes` sends the referenced
@@ -218,7 +218,7 @@ pages and Launchpad email for acceptance or build errors. Once published, test
 installation on a clean Ubuntu 24.04 system.
 
 Before a corrected upload, increment the revision in `debian/changelog`, for
-example `2.2.0-0ppa1~noble2`; Launchpad does not replace accepted versions.
+example `2.2.1-0ppa1~noble2`; Launchpad does not replace accepted versions.
 For another Ubuntu series, test it and use its actual changelog suite and a
 distinct version. The builder discovers compatible supported suites from
 Ubuntu release data; changing series/revision requires `--orig` so the original
@@ -273,7 +273,7 @@ the parent directory of the extracted source. For example, on Resolute, run
 this from that parent directory:
 
 ```sh
-sudo apt install ./uoo-boot-manager_2.2.0-0ppa1~resolute1_all.deb
+sudo apt install ./uoo-boot-manager_2.2.1-0ppa1~resolute1_all.deb
 ```
 
 Subsequent PPA versions are delivered through normal APT updates. To seek
@@ -334,14 +334,14 @@ The manifest expects all listed Linux assets in the current directory. Confirm
 the app version and commit, then upload the two Snap files:
 
 ```sh
-snapcraft upload --release=edge uoo-boot-manager_2.2.0_amd64.snap
-snapcraft upload --release=edge uoo-boot-manager_2.2.0_arm64.snap
+snapcraft upload --release=edge uoo-boot-manager_2.2.1_amd64.snap
+snapcraft upload --release=edge uoo-boot-manager_2.2.1_arm64.snap
 snapcraft revisions uoo-boot-manager
 ```
 
 An upload can remain held for review until classic confinement is approved.
 Record the separate numeric revision for each architecture. The app version
-`2.2.0` is not a Snap revision number.
+`2.2.1` is not a Snap revision number.
 
 If building locally, use the [packaging guide](PACKAGING.md). The current
 Snap builder uses `snapcraft --destructive-mode`; use a disposable Ubuntu

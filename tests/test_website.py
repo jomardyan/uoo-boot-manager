@@ -44,7 +44,7 @@ for (const [value, suffix, manifest] of [
   change({target:{value}});
   assert(elements.get('#download-button').href.endsWith(suffix));
   assert(elements.get('#checksum-link').href.endsWith(manifest));
-  assert(elements.get('#download-button').href.includes('/v2.2.0/'));
+  assert(elements.get('#download-button').href.includes('/v2.2.1/'));
 }
 tabs[1].listeners.click();
 assert.equal(elements.get('#windows-preview').hidden,true);

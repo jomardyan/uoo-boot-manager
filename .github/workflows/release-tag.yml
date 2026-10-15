@@ -53,7 +53,7 @@ jobs:
             gh api --method POST "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
           fi
           # Token-created tag pushes do not trigger workflows; dispatch both explicitly.
-          gh workflow run verify.yml --ref "$tag"
+          gh workflow run verify.yml --ref "$tag" -f run_vm=true
           gh workflow run windows.yml --ref "$tag"
 
   publish:

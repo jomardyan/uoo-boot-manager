@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml/badge.svg?branch=main&amp;event=push" alt="Linux package build status on main"></a>
   <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml/badge.svg?branch=main&amp;event=push" alt="Windows 11 package build status on main"></a>
-  <a href="https://github.com/jomardyan/uoo-boot-manager/releases"><img src="https://img.shields.io/badge/version-2.2.0-E95420" alt="App version 2.2.0"></a>
+  <a href="https://github.com/jomardyan/uoo-boot-manager/releases"><img src="https://img.shields.io/badge/version-2.2.1-E95420" alt="App version 2.2.1"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
@@ -112,7 +112,7 @@ If the PPA build for your release is still queued, use the universal `.deb`
 from a published GitHub release instead. Run these commands in its directory:
 
 ```sh
-sudo apt install ./uoo-boot-manager_2.2.0_all.deb
+sudo apt install ./uoo-boot-manager_2.2.1_all.deb
 uoo-boot-manager
 ```
 
@@ -264,7 +264,7 @@ Without Make:
 
 ```sh
 bash scripts/build-deb.sh
-python3 scripts/check-package.py dist/uoo-boot-manager_2.2.0_all.deb
+python3 scripts/check-package.py dist/uoo-boot-manager_2.2.1_all.deb
 python3 -m unittest discover -s tests -v
 ```
 

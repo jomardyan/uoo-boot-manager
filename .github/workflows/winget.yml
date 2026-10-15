@@ -82,12 +82,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WinGet installation failed.' }
           $registration = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1'
           if ($registration.DisplayVersion -ne $version) { throw 'Installed version differs from the manifest.' }
+          if ($registration.DisplayName -ne "Uoo Boot Manager version $version") { throw 'Installed display name differs from AppsAndFeaturesEntries.' }
           foreach ($file in @('Uoo.BootManager.exe', 'Uoo.BootHelper.exe')) {
             if (!(Test-Path (Join-Path $env:ProgramFiles "Uoo Boot Manager\$file"))) { throw "Missing installed $file" }
           }
       - name: Uninstall with WinGet
         run: |
-          & $env:UOO_WINGET uninstall --name 'Uoo Boot Manager' --exact --silent --accept-source-agreements --disable-interactivity
+          & $env:UOO_WINGET uninstall --product-code '{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1' --silent --accept-source-agreements --disable-interactivity
           if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootManager.exe')) { throw 'The desktop remains after uninstall.' }
           if (Test-Path (Join-Path $env:ProgramFiles 'Uoo Boot Manager\Uoo.BootHelper.exe')) { throw 'The helper remains after uninstall.' }

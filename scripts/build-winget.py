@@ -111,6 +111,8 @@ def documents(version, installers):
         "installer": dict(common, InstallerLocale="en-US", MinimumOSVersion="10.0.22000.0",
             InstallerType="inno", Scope="machine", UpgradeBehavior="install",
             ProductCode=PRODUCT_CODE, ElevationRequirement="elevationRequired",
+            AppsAndFeaturesEntries=[{"DisplayName": f"Uoo Boot Manager version {version}",
+                "Publisher": "Hayk Jomardyan", "DisplayVersion": version, "ProductCode": PRODUCT_CODE}],
             Installers=installers, ManifestType="installer", ManifestVersion=SCHEMA),
     }
 

@@ -61,8 +61,8 @@ demo without applying boot changes:
 
 ```powershell
 & 'C:\Program Files\Uoo Boot Manager\Uoo.BootManager.exe' --demo
-winget list --name 'Uoo Boot Manager' --exact
-winget uninstall --name 'Uoo Boot Manager' --exact --silent
+winget list --name 'Uoo Boot Manager'
+winget uninstall --product-code '{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1' --silent --accept-source-agreements
 winget settings --disable LocalManifestFiles
 ```
 
@@ -72,6 +72,11 @@ it for other packages. The repository's **Validate WinGet package** workflow
 performs schema/install/uninstall checks on disposable native x64 and ARM64
 runners, without submitting a community PR or changing boot configuration.
 [Microsoft local-manifest instructions](https://learn.microsoft.com/en-us/windows/package-manager/winget/install#local-install)
+
+The published 2.2.0 installer registers the name **Uoo Boot Manager version
+2.2.0** in Windows Apps & features. The manifest records that exact name and
+version; the product-code uninstall command also works before catalog
+publication. [Microsoft uninstall options](https://learn.microsoft.com/en-us/windows/package-manager/winget/uninstall)
 
 ## Submit to Microsoft's community repository
 

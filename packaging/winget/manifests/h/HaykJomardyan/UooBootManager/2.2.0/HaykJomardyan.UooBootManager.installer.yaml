@@ -9,6 +9,11 @@ Scope: "machine"
 UpgradeBehavior: "install"
 ProductCode: "{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1"
 ElevationRequirement: "elevationRequired"
+AppsAndFeaturesEntries:
+  - DisplayName: "Uoo Boot Manager version 2.2.0"
+    Publisher: "Hayk Jomardyan"
+    DisplayVersion: "2.2.0"
+    ProductCode: "{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1"
 Installers:
   - Architecture: "x64"
     InstallerUrl: "https://github.com/jomardyan/uoo-boot-manager/releases/download/v2.2.0/Uoo-Boot-Manager-2.2.0-windows-x64-setup.exe"

@@ -59,6 +59,9 @@ class WingetTests(unittest.TestCase):
         self.assertEqual(installer["InstallerType"], "inno")
         self.assertEqual(installer["Scope"], "machine")
         self.assertEqual(installer["MinimumOSVersion"], "10.0.22000.0")
+        self.assertEqual(installer["AppsAndFeaturesEntries"][0], {
+            "DisplayName": "Uoo Boot Manager version 2.2.0", "DisplayVersion": "2.2.0",
+            "Publisher": "Hayk Jomardyan", "ProductCode": builder.PRODUCT_CODE})
 
     def test_existing_version_is_preserved_and_changed_metadata_refused(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -96,8 +96,16 @@ tools, storage layout, and platform prerequisites.
 
 ### Ubuntu
 
-Download the `.deb` from a published release, then run these commands in the
-directory containing the package:
+On Ubuntu 24.04 LTS, install from the PPA to receive updates through APT:
+
+```sh
+sudo add-apt-repository ppa:mastercrypt/uoo
+sudo apt update
+sudo apt install uoo-boot-manager
+```
+
+Alternatively, download the `.deb` from a published release, then run these
+commands in the directory containing the package:
 
 ```sh
 sudo apt install ./uoo-boot-manager_2.2.0_all.deb

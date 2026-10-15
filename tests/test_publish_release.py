@@ -68,11 +68,49 @@ class ReleasePublicationTests(unittest.TestCase):
     def test_incomplete_release_never_downloads_or_publishes(self):
         responses = [{"object": {"type": "commit", "sha": SHA}},
                      {"workflow_runs": [self.run_record()]}, {"workflow_runs": [self.run_record()]},
-                     {"draft": True, "assets": [{"name": "app.deb"}]}]
+                     [{"tag_name": "v2.2.0", "id": 42}],
+                     {"id": 42, "draft": True, "assets": [{"name": "app.deb"}]}]
         with patch.object(publisher, "api", side_effect=responses), patch.object(publisher.subprocess, "run") as run:
             with self.assertRaisesRegex(ValueError, "Release assets"):
                 publisher.publish("example/repo", "2.2.0", SHA, ROOT / "docs/releases/2.2.0.md")
         run.assert_not_called()
+
+    def test_draft_is_found_by_listing_then_loaded_by_id(self):
+        draft = {"tag_name": "v2.2.0", "id": 42, "draft": True, "assets": []}
+        with patch.object(publisher, "api", side_effect=[[draft], draft]) as api:
+            self.assertEqual(publisher.find_release("example/repo", "v2.2.0"), draft)
+        self.assertEqual([call.args[0] for call in api.call_args_list], [
+            "repos/example/repo/releases?per_page=100&page=1", "repos/example/repo/releases/42"])
+
+    def test_release_lookup_checks_subsequent_pages_and_rejects_missing_tag(self):
+        other = {"tag_name": "v1.0.0", "id": 1}
+        target = {"tag_name": "v2.2.0", "id": 42}
+        with patch.object(publisher, "api", side_effect=[[other] * 100, [target], target]):
+            self.assertEqual(publisher.find_release("example/repo", "v2.2.0"), target)
+        with patch.object(publisher, "api", return_value=[other]):
+            with self.assertRaisesRegex(ValueError, "No draft or published release"):
+                publisher.find_release("example/repo", "v2.2.0")
+
+    def test_complete_draft_is_verified_and_published_then_confirmed_by_id(self):
+        linux, windows = publisher.expected_packages("2.2.0")
+        draft = {"id": 42, "tag_name": "v2.2.0", "draft": True,
+                 "assets": [{"name": name} for name in linux | windows | {"SHA256SUMS", "SHA256SUMS-Windows"}]}
+        published = dict(draft, draft=False, prerelease=False, html_url="https://github.com/example/repo/releases/tag/v2.2.0")
+        responses = [{"object": {"type": "commit", "sha": SHA}},
+                     {"workflow_runs": [self.run_record()]}, {"workflow_runs": [self.run_record()]},
+                     [draft], draft, published]
+        def command(args, **kwargs):
+            if args[:3] == ["gh", "release", "download"]:
+                directory = Path(args[args.index("--dir") + 1])
+                for name in linux | windows:
+                    (directory / name).write_bytes(name.encode())
+                for manifest, names in (("SHA256SUMS", linux), ("SHA256SUMS-Windows", windows)):
+                    (directory / manifest).write_text("".join(hashlib.sha256(name.encode()).hexdigest() + "  " + name + "\n" for name in sorted(names)))
+        with patch.object(publisher, "api", side_effect=responses) as api, patch.object(publisher.subprocess, "run", side_effect=command) as run:
+            publisher.publish("example/repo", "2.2.0", SHA, ROOT / "docs/releases/2.2.0.md")
+        self.assertEqual(api.call_args.args[0], "repos/example/repo/releases/42")
+        self.assertEqual(run.call_count, 2)
+        self.assertIn("--draft=false", run.call_args.args[0])
 
 
 if __name__ == "__main__":

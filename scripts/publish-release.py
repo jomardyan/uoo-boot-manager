@@ -16,6 +16,22 @@ def api(path):
     return json.loads(result.stdout)
 
 
+def find_release(repo, tag):
+    # The tag endpoint resolves published releases; list releases also includes
+    # drafts when authenticated with repository write access.
+    page = 1
+    while True:
+        releases = api(f"repos/{repo}/releases?per_page=100&page={page}")
+        matches = [release for release in releases if release["tag_name"] == tag]
+        if len(matches) > 1:
+            raise ValueError("Multiple releases found for " + tag)
+        if matches:
+            return api(f"repos/{repo}/releases/{matches[0]['id']}")
+        if len(releases) < 100:
+            raise ValueError("No draft or published release found for " + tag)
+        page += 1
+
+
 def expected_packages(version):
     linux = {
         f"uoo-boot-manager_{version}_all.deb",
@@ -84,7 +100,7 @@ def publish(repo, version, sha, notes, timeout=3600):
         print("Waiting for validated Linux and Windows release builds...", flush=True)
         time.sleep(30)
 
-    release = api(f"repos/{repo}/releases/tags/{tag}")
+    release = find_release(repo, tag)
     linux, windows = expected_packages(version)
     expected = linux | windows | {"SHA256SUMS", "SHA256SUMS-Windows"}
     names = [asset["name"] for asset in release["assets"]]
@@ -97,7 +113,7 @@ def publish(repo, version, sha, notes, timeout=3600):
         verify_manifest(directory, "SHA256SUMS-Windows", windows)
     if release["draft"]:
         subprocess.run(["gh", "release", "edit", tag, "--repo", repo, "--draft=false", "--latest", "--notes-file", str(notes)], check=True)
-    published = api(f"repos/{repo}/releases/tags/{tag}")
+    published = api(f"repos/{repo}/releases/{release['id']}")
     if published["draft"] or published["prerelease"]:
         raise ValueError("GitHub did not confirm a published stable release")
     print("Published verified release: " + published["html_url"], flush=True)

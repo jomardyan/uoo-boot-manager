@@ -1,0 +1,55 @@
+name: Publish an existing verified release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing release version to publish (for example 2.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-existing-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: "github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'publish: v')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify and publish packages from the existing immutable tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$REQUESTED_VERSION"
+          if [[ -z "$version" ]]; then
+            request="${HEAD_MESSAGE%%$'\n'*}"
+            version="${request#publish: v}"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Expected an existing semantic release version.\n' >&2
+            exit 1
+          fi
+          commit="$(git rev-parse "refs/tags/v$version^{commit}")"
+          notes="$RUNNER_TEMP/uoo-release-notes.md"
+          git show "v$version:docs/releases/$version.md" > "$notes"
+          python3 scripts/publish-release.py --repo "$GH_REPO" \
+            --version "$version" --commit "$commit" --notes "$notes"

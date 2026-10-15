@@ -143,7 +143,7 @@ internal sealed class ProtectedStore
         {
             var id = Path.GetFileName(directory);
             try { var value = Read(id); result.Add(new() { Id = id, Description = value.Description, CreatedAt = value.CreatedAt, CanRestore = true, Detail = value.Efi is null ? "BCD and firmware state" : "BCD, firmware, and system EFI files" }); }
-            catch (Exception error) when (error is IOException or JsonException or ArgumentException)
+            catch (Exception error) when (error is IOException or JsonException or ArgumentException or UnauthorizedAccessException)
             { result.Add(new() { Id = id, Description = "Damaged backup", CanRestore = false, Detail = error.Message }); }
         }
         return result.OrderByDescending(e => e.CreatedAt).ToList();
@@ -163,7 +163,10 @@ internal sealed class ProtectedStore
         _ = Bcd.Id(value.CurrentId);
         if (value.BootSession.Length != 0 && !Regex.IsMatch(value.BootSession, @"^[0-9A-F]{64}$")) throw new IOException("Invalid backup boot-session identity.");
         if (value.CreatedFirmwareId.Length != 0) _ = Bcd.Id(value.CreatedFirmwareId);
-        if (value.CreatedFirmwareId.Length != 0 && (value.CreatedFirmware is null || value.CreatedFirmware.Id != value.CreatedFirmwareId)) throw new IOException("Invalid created firmware identity.");
+        if (value.CreatedFirmwareId.Length != 0 && (value.CreatedFirmware is null || value.CreatedFirmware.Id != value.CreatedFirmwareId ||
+            value.CreatedFirmware.Description is null || value.CreatedFirmware.Path is null || value.CreatedFirmware.PartitionVolume is null ||
+            value.CreatedFirmware.Device is not { Type: 2, Path.Length: > 0, AdditionalOptions.Length: 0 }))
+            throw new IOException("Invalid created firmware identity.");
         if (value.Firmware.Count > 2048 || value.FirmwareOrder.Count > 2048 || value.FirmwareOnce.Count > 1 ||
             value.Firmware.Select(f => Bcd.Id(f.Id)).Distinct().Count() != value.Firmware.Count ||
             value.FirmwareOrder.Select(Bcd.Id).Distinct().Count() != value.FirmwareOrder.Count)

@@ -246,5 +246,132 @@ await Test("pipe framing rejects invalid sizes and truncation", async () =>
     using var shortStream = new MemoryStream(new byte[] { 10, 0, 0, 0, 1 });
     bool truncated = false; try { await PipeProtocol.ReadAsync(shortStream, default); } catch (EndOfStreamException) { truncated = true; } Check(truncated);
 });
+await Test("malformed imported values fail without exceptions or backups", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var valid = JsonSerializer.SerializeToNode(new WindowsConfiguration
+    {
+        Menu = before.Menu,
+        Entries = [new() { Id = DemoBootService.OtherWindowsId, Description = "Work" }]
+    }, BootJson.Options)!;
+    foreach (var path in new[] { "menu.order", "menu.defaultId", "menu.bootOnceId", "entries.0", "entries.0.id", "entries.0.description", "entries.0.options", "entries.0.options.safeBoot", "entries.0.options.menuPolicy" })
+    {
+        var malformed = valid.DeepClone();
+        var parts = path.Split('.'); System.Text.Json.Nodes.JsonNode parent = malformed;
+        foreach (var part in parts[..^1]) parent = int.TryParse(part, out var index) ? parent[index]! : parent[part]!;
+        if (int.TryParse(parts[^1], out var lastIndex)) parent[lastIndex] = null; else parent[parts[^1]] = null;
+        var response = await Send(service, new() { Operation = BootOperation.ImportConfiguration, ConfigurationJson = malformed.ToJsonString() });
+        Check(!response.Success, "Accepted null at " + path);
+        Check(response.Snapshot!.Revision == before.Revision && response.Snapshot.Backups.Count == 0, "Changed state for " + path);
+    }
+});
+await Test("partial configuration imports recompute all default flags", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var config = new WindowsConfiguration
+    {
+        Menu = before.Menu with { DefaultId = DemoBootService.OtherWindowsId.ToUpperInvariant() },
+        Entries = [new() { Id = DemoBootService.OtherWindowsId.ToUpperInvariant(), Description = "  Updated work  " }]
+    };
+    var state = await Apply(service, new() { Operation = BootOperation.ImportConfiguration, ConfigurationJson = JsonSerializer.Serialize(config, BootJson.Options) });
+    Check(state.Menu.DefaultId == DemoBootService.OtherWindowsId);
+    Check(state.Entries.Single(x => x.IsDefault).Id == DemoBootService.OtherWindowsId);
+    Check(state.Entries.Single(x => x.Id == DemoBootService.OtherWindowsId).Description == "Updated work");
+    Check(!(await Send(service, new() { Operation = BootOperation.DeleteEntry, TargetId = DemoBootService.OtherWindowsId })).Success);
+});
+await Test("firmware restore recovers saved exclusions and retains later registrations", async () =>
+{
+    var service = new DemoBootService();
+    var excluded = await Apply(service, new() { Operation = BootOperation.SetFirmwareOrder, Order = [DemoBootService.FirmwareWindowsId] });
+    var saved = await Apply(service, new() { Operation = BootOperation.CreateBackup }); var backup = saved.Backups[0].Id;
+    await Apply(service, new() { Operation = BootOperation.SetFirmwareOrder, Order = [DemoBootService.FirmwareWindowsId, DemoBootService.FirmwareUbuntuId] });
+    var added = await Apply(service, new() { Operation = BootOperation.AddFirmwareEntry, Description = "Later", EfiPartition = @"S:\", EfiLoaderPath = @"\EFI\later\boot.efi" });
+    var later = added.Firmware.Entries.Single(e => e.Description == "Later");
+    var restored = await Apply(service, new() { Operation = BootOperation.RestoreBackup, BackupId = backup });
+    Check(restored.Firmware.Order.SequenceEqual(new[] { DemoBootService.FirmwareWindowsId, later.Id }));
+    Check(restored.Firmware.Entries.Count == 3);
+});
+await Test("configuration round trip preserves Windows once and permits hidden entries", async () =>
+{
+    var service = new DemoBootService();
+    var before = await Apply(service, new() { Operation = BootOperation.SetBootOnce, TargetId = DemoBootService.OtherWindowsId });
+    var config = new WindowsConfiguration
+    {
+        Menu = before.Menu with { Order = [DemoBootService.WindowsId], BootOnceId = "" },
+        Entries = before.Entries.Select(e => new ConfigurationEntry { Id = e.Id, Description = e.Description, Options = e.Options }).ToList()
+    };
+    var hidden = await Apply(service, new() { Operation = BootOperation.ImportConfiguration, ConfigurationJson = JsonSerializer.Serialize(config, BootJson.Options) });
+    Check(hidden.Entries.Count == 2 && hidden.Menu.Order.Count == 1 && hidden.Menu.BootOnceId == DemoBootService.OtherWindowsId);
+    var exported = await Send(service, new() { Operation = BootOperation.ExportConfiguration });
+    Check(BootConfiguration.Parse(exported.ConfigurationJson, hidden).Menu.BootOnceId == "");
+});
+await Test("configuration format updates only Windows loaders", () =>
+{
+    var snapshot = new BootSnapshot
+    {
+        Entries = [new() { Id = DemoBootService.WindowsId, Description = "Windows", IsWindows = true, IsCurrent = true },
+            new() { Id = DemoBootService.OtherWindowsId, Description = "Other application" }],
+        Menu = new() { DefaultId = DemoBootService.OtherWindowsId, Order = [DemoBootService.WindowsId, DemoBootService.OtherWindowsId] }
+    };
+    var json = BootConfiguration.Export(snapshot); var config = BootConfiguration.Parse(json, snapshot);
+    Check(config.Entries.Count == 1 && config.Menu.DefaultId == DemoBootService.OtherWindowsId);
+    var invalid = config with { Entries = [new() { Id = DemoBootService.OtherWindowsId, Description = "Changed" }] };
+    bool refused = false;
+    try { BootConfiguration.Parse(JsonSerializer.Serialize(invalid, BootJson.Options), snapshot); } catch (ArgumentException) { refused = true; }
+    Check(refused);
+    return Task.CompletedTask;
+});
+await Test("configuration files enforce byte limits and strict UTF-8", async () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "uoo-config-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "configuration.json");
+    try
+    {
+        await File.WriteAllBytesAsync(path, new byte[BootConfiguration.MaximumBytes + 1]);
+        bool refused = false;
+        try { await BootConfiguration.ReadFileAsync(path); } catch (InvalidDataException) { refused = true; }
+        Check(refused);
+        await File.WriteAllBytesAsync(path, new byte[] { 0xff, 0xfe, 0x00 });
+        refused = false;
+        try { await BootConfiguration.ReadFileAsync(path); } catch (InvalidDataException) { refused = true; }
+        Check(refused);
+        await File.WriteAllTextAsync(path, "{}", new System.Text.UTF8Encoding(true));
+        Check(await BootConfiguration.ReadFileAsync(path) == "{}");
+        var service = new DemoBootService(); var before = await Inspect(service);
+        var oversized = "{\"padding\":\"" + new string('Ж', BootConfiguration.MaximumBytes / 2) + "\"}";
+        var result = await Send(service, new() { Operation = BootOperation.ImportConfiguration, ConfigurationJson = oversized });
+        Check(!result.Success && result.Snapshot!.Revision == before.Revision && result.Snapshot.Backups.Count == 0);
+    }
+    finally { Directory.Delete(directory, true); }
+});
+await Test("canceled export preserves the previous file and cleans temporary files", async () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "uoo-export-tests-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "configuration.json");
+    try
+    {
+        await File.WriteAllTextAsync(path, "original");
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        bool canceled = false;
+        try { await BootConfiguration.WriteFileAsync(path, "replacement", cancellation.Token); } catch (OperationCanceledException) { canceled = true; }
+        Check(canceled && await File.ReadAllTextAsync(path) == "original");
+        Check(Directory.GetFiles(directory).Length == 1);
+        await BootConfiguration.WriteFileAsync(path, "replacement");
+        Check(await File.ReadAllTextAsync(path) == "replacement" && Directory.GetFiles(directory).Length == 1);
+    }
+    finally { Directory.Delete(directory, true); }
+});
+await Test("manual backup names are validated before mutation", () => Reject(new() { Operation = BootOperation.CreateBackup, Description = "Invalid\nname" }));
+await Test("pipe framing rejects invalid UTF-8", async () =>
+{
+    using var stream = new MemoryStream(new byte[] { 2, 0, 0, 0, 0xc3, 0x28 });
+    bool refused = false;
+    try { await PipeProtocol.ReadAsync(stream, default); } catch (System.Text.DecoderFallbackException) { refused = true; }
+    Check(refused);
+});
+foreach (var loader in new[] { @"\EFI\boot\bootx64.efi" + "\n", @"\EFI\boot.\bootx64.efi", @"\EFI\boot \bootx64.efi", @"\EFI\boot\\bootx64.efi", @"\EFI\" + new string('a', 240) + ".efi" })
+    await Test("reject malformed EFI path " + JsonSerializer.Serialize(loader), () => Reject(new() { Operation = BootOperation.AddFirmwareEntry, Description = "Test", EfiPartition = @"S:\", EfiLoaderPath = loader }));
+foreach (var partition in new[] { @"S:\" + "\n", @"\\?\Volume{------------------------------------}\" })
+    await Test("reject malformed ESP " + JsonSerializer.Serialize(partition), () => Reject(new() { Operation = BootOperation.AddFirmwareEntry, Description = "Test", EfiPartition = partition, EfiLoaderPath = @"\EFI\boot\bootx64.efi" }));
 Console.WriteLine($"{passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

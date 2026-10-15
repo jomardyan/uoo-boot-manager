@@ -79,6 +79,18 @@ downloadable Snap is unsigned for local installation; publishing classic snaps
 to the Snap Store requires a separate store review and is not performed by CI.
 These builds do not publish to Flathub, the AUR, or any distro package repository.
 
+## Ubuntu release compatibility
+
+One architecture-independent DEB is used across compatible Ubuntu 24.04+
+releases. The workflow installs and starts that same artifact in Ubuntu 24.04,
+26.04, and 26.10 containers before collecting release assets. These checks
+cover package installation and demo startup, not every firmware/storage layout.
+
+For APT, each Ubuntu codename still needs its own published PPA entry. Use
+`python3 scripts/build-ppa-source.py --list-series` to discover current targets
+and `--all-supported` to prepare suite-specific uploads while reusing the same
+upstream archive. See [multi-release PPA publishing](PUBLISHING.md#build-for-every-compatible-supported-ubuntu-release).
+
 ## Download a build
 
 Open **Actions → Build Linux packages → a successful run → Artifacts** and

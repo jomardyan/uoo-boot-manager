@@ -96,7 +96,11 @@ tools, storage layout, and platform prerequisites.
 
 ### Ubuntu
 
-On Ubuntu 24.04 LTS, install from the PPA to receive updates through APT:
+The architecture-independent `.deb` supports Ubuntu 24.04 and newer with the
+required GTK4/libadwaita libraries. CI checks the same package on Ubuntu 24.04,
+26.04, and 26.10. For APT updates, first confirm that the
+[PPA](https://launchpad.net/~mastercrypt/+archive/ubuntu/uoo) has published a
+successful binary build for your Ubuntu codename (`lsb_release -cs`). Then run:
 
 ```sh
 sudo add-apt-repository ppa:mastercrypt/uoo
@@ -104,8 +108,8 @@ sudo apt update
 sudo apt install uoo-boot-manager
 ```
 
-Alternatively, download the `.deb` from a published release, then run these
-commands in the directory containing the package:
+If the PPA build for your release is still queued, use the universal `.deb`
+from a published GitHub release instead. Run these commands in its directory:
 
 ```sh
 sudo apt install ./uoo-boot-manager_2.2.0_all.deb

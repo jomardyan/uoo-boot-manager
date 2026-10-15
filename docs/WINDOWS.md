@@ -98,9 +98,24 @@ private recovery backups, and inspect the running system read-only. They
 verify that the system BCD inventory is unchanged.
 Never run experimental live boot tests on a machine without recovery access.
 
+The platform suite also offers a read-only, cross-platform subset:
+
+```sh
+dotnet run --project windows/Uoo.Platform.Tests -c Release -- --portable
+```
+
+This checks firmware load-option parsing, EFI image validation, restore
+protections, and deletion references without accessing Windows or boot state.
+The model suite covers malformed configurations, partial imports, firmware
+restore exclusions, bounded UTF-8 reads, and canceled exports. Demo and live
+imports share the same validation and 1 MiB UTF-8 file limit. Exports replace
+the selected file only after the complete configuration has been written.
+Native WMI, UAC, desktop smoke tests, installation, and live recovery still
+require Windows; cross-platform builds do not establish those results.
+
 If GNU Make, Bash, and PowerShell 7 are available on the Windows build host,
 the root Makefile also provides `make windows-test` for the portable
-model/protocol suite and `make windows WINDOWS_RUNTIME=win-arm64` for packaging
+model/protocol and platform suites and `make windows WINDOWS_RUNTIME=win-arm64` for packaging
 (the default runtime is `win-x64`). Pass script options with
 `WINDOWS_BUILD_ARGS`, for example
 `make windows WINDOWS_BUILD_ARGS="-SkipInstaller"` to produce only the ZIP.

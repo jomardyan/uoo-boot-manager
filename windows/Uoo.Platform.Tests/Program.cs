@@ -6,10 +6,11 @@ using System.Text.Json;
 using Uoo.Core;
 using Uoo.Platform;
 
-if (!OperatingSystem.IsWindows()) { Console.Error.WriteLine("Native BCD tests require Windows."); return 2; }
-if (!WindowsMachine.Administrator) { Console.Error.WriteLine("Native BCD tests require an elevated disposable test machine."); return 2; }
+bool portable = args.Length == 1 && args[0] == "--portable";
+if (!portable && !OperatingSystem.IsWindows()) { Console.Error.WriteLine("Native BCD tests require Windows."); return 2; }
+if (!portable && !WindowsMachine.Administrator) { Console.Error.WriteLine("Native BCD tests require an elevated disposable test machine."); return 2; }
 if (args.Length == 2 && args[0] == "--live-integration") return await LiveTransactions.RunAsync(args[1]);
-if (args.Length != 0) { Console.Error.WriteLine("Unsupported native test arguments."); return 2; }
+if (!portable && args.Length != 0) { Console.Error.WriteLine("Unsupported native test arguments."); return 2; }
 int passed = 0, failed = 0;
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 void Test(string name, Action test)
@@ -26,9 +27,6 @@ string SystemBcd()
     if (process.ExitCode != 0) throw new Exception("Read-only BCD baseline failed: " + error);
     return output;
 }
-string baseline = SystemBcd();
-string directory = Path.Combine(Path.GetTempPath(), "uoo-bcd-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
-string file = Path.Combine(directory, "isolated.bcd");
 byte[] EfiLoadOption()
 {
     using var output = new MemoryStream(); using var writer = new BinaryWriter(output, Encoding.Unicode);
@@ -81,7 +79,7 @@ Test("PE validation accepts native 64-bit EFI images only", () =>
 });
 Test("PE validation rejects ordinary Windows and truncated executables", () =>
 {
-    foreach (var fixture in new[] { PeImage(Architecture.X64, 3), PeImage(Architecture.X64)[..64], new byte[1024] })
+    foreach (var fixture in new[] { PeImage(Architecture.X64, 3), PeImage(Architecture.X64)[..64], PeImage(Architecture.X64)[..512], new byte[1024] })
     {
         using var stream = new MemoryStream(fixture);
         bool refused = false; try { WindowsMachine.ValidateEfiImage(stream, Architecture.X64); } catch (ArgumentException) { refused = true; } Check(refused);
@@ -134,6 +132,32 @@ Test("backup restore rejects newly exposed inherited integrity flags", () =>
         Check(refused, "A restored inheritance edge introduced a bypass.");
     }
 });
+Test("entry deletion preserves manager references beyond display order", () =>
+{
+    var target = DemoBootService.OtherWindowsId; var current = DemoBootService.WindowsId;
+    var manager = new BcdRecord(Bcd.Manager, 0x10100002, new() { [Bcd.Order] = new[] { current, target }, [Bcd.Default] = current });
+    WindowsBootService.ValidateEntryDeletion([manager], target);
+    foreach (var reference in new[] { (Bcd.Sequence, (object)new[] { current, target }), (Bcd.Default, (object)target), (0x24000010u, (object)new[] { target }) })
+    {
+        var elements = new Dictionary<uint, object?>(manager.Elements) { [reference.Item1] = reference.Item2 };
+        bool refused = false;
+        try { WindowsBootService.ValidateEntryDeletion([manager with { Elements = elements }], target.ToUpperInvariant()); }
+        catch (ArgumentException) { refused = true; }
+        Check(refused, "A manager reference would be orphaned.");
+    }
+    var recovery = new BcdRecord(current, Bcd.WindowsLoader, new() { [0x14000008] = new[] { target } });
+    bool recoveryRefused = false;
+    try { WindowsBootService.ValidateEntryDeletion([manager, recovery], target); } catch (ArgumentException) { recoveryRefused = true; }
+    Check(recoveryRefused);
+});
+if (portable)
+{
+    Console.WriteLine($"{passed} portable platform tests passed, {failed} failed");
+    return failed == 0 ? 0 : 1;
+}
+string baseline = SystemBcd();
+string directory = Path.Combine(Path.GetTempPath(), "uoo-bcd-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(directory);
+string file = Path.Combine(directory, "isolated.bcd");
 try
 {
     using var bcd = BcdStore.CreateOffline(file);

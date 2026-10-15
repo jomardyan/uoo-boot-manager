@@ -1,7 +1,7 @@
 # Publish Uoo on Ubuntu: APT, Snap, and App Center
 
 Maintainer instructions for distributing Uoo Boot Manager. Examples use app
-version **2.2.0** and Ubuntu **24.04 LTS (`noble`)**. Replace versions, account
+version **2.2.0**, Ubuntu **24.04 LTS (`noble`)**, and **26.04 LTS (`resolute`)**. Replace versions, account
 names, signing-key fingerprints, and revision numbers with your own values.
 
 This guide documents publication; the repository's build workflows do not
@@ -22,7 +22,7 @@ For the Windows edition, see [Microsoft Store publishing](WINDOWS-STORE.md).
 **Current repository status:** CI produces a binary `.deb` and classic `.snap`
 packages for `amd64` and `arm64`. Debian source packaging is provided in
 `debian/`; `scripts/build-ppa-source.py` creates an unsigned source upload for
-Ubuntu 24.04. The Snap supplies the desktop; authenticated boot changes require
+each compatible supported Ubuntu 24.04+ suite. The Snap supplies the desktop; authenticated boot changes require
 the matching native host package and its polkit helper.
 
 See [Linux packaging](PACKAGING.md) for build prerequisites, architecture
@@ -150,6 +150,50 @@ replace an existing bundle: for another local build, use a fresh output path,
 for example `python3 scripts/build-ppa-source.py --output dist/ppa-rebuild`.
 Use that chosen path in the signing and upload commands too.
 
+### Build for every compatible supported Ubuntu release
+
+The binary desktop package is architecture-independent (`Architecture: all`)
+and requires GTK4 4.6+, libadwaita 1.5+, and Python 3.10+. Ubuntu 24.04+ meets
+the baseline; earlier Ubuntu releases need different runtime packaging. APT
+still requires a published repository entry for **each Ubuntu suite**.
+
+The source builder reads `/usr/share/distro-info/ubuntu.csv` from Ubuntu's
+`distro-info-data` package. It automatically excludes pre-24.04, end-of-life,
+and unreleased versions. Update `distro-info-data` as new Ubuntu releases
+become available, then inspect the targets:
+
+```sh
+python3 scripts/build-ppa-source.py --list-series
+```
+
+As of 16 October 2026, the targets are Noble 24.04, Resolute 26.04, and
+Stonking 26.10. To prepare new revision 2 uploads for all of them using the
+already uploaded upstream source archive:
+
+```sh
+python3 scripts/build-ppa-source.py --all-supported --revision 2 \
+  --orig dist/ppa/uoo-boot-manager_2.2.0.orig.tar.gz \
+  --output dist/ppa-universal
+```
+
+Each suite gets its own directory and package version, such as
+`dist/ppa-universal/resolute/uoo-boot-manager_2.2.0-0ppa1~resolute2_source.changes`.
+The upstream `.orig.tar.gz` stays byte-identical across all targets. You can
+select a subset with `--series noble resolute` instead of `--all-supported`.
+
+Test each package, then sign and upload every selected suite:
+
+```sh
+for changes in dist/ppa-universal/*/*_source.changes; do
+  debsign -k096689AA98D70F17209D36EE61902E85BBCF9FD0 "$changes" || break
+  dput ppa:mastercrypt/uoo "$changes" || break
+done
+```
+
+Increment `--revision` before a corrected upload and use a fresh output path.
+The same app version does not permit replacing an accepted source upload.
+[Ubuntu release data](https://manpages.debian.org/testing/distro-info/ubuntu-distro-info.1.en.html)
+
 ### Sign, upload, and check
 
 Install `devscripts` and `dput` from the prerequisites above. Sign the existing
@@ -176,7 +220,9 @@ installation on a clean Ubuntu 24.04 system.
 Before a corrected upload, increment the revision in `debian/changelog`, for
 example `2.2.0-0ppa1~noble2`; Launchpad does not replace accepted versions.
 For another Ubuntu series, test it and use its actual changelog suite and a
-distinct version. The current builder targets `noble` explicitly.
+distinct version. The builder discovers compatible supported suites from
+Ubuntu release data; changing series/revision requires `--orig` so the original
+upstream archive is retained.
 [Launchpad source upload instructions](https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/)
 
 To test a binary build locally, install the declared build dependencies, extract
@@ -186,13 +232,45 @@ the resulting package or change boot configuration.
 
 ### Give users these installation commands
 
-After the PPA package has built and published:
+First check that a binary build has succeeded **for the user's Ubuntu suite**
+and that the PPA has published its signed repository index. A source upload
+being accepted or queued is not enough. Then give users these commands:
 
 ```sh
 sudo apt install software-properties-common
 sudo add-apt-repository ppa:mastercrypt/uoo
 sudo apt update
 sudo apt install uoo-boot-manager
+```
+
+### Troubleshoot `403 Forbidden`, `InRelease`, and `Missing Signed-By`
+
+For this newly created public PPA, check both publication and suite coverage.
+For example, Ubuntu 26.04 requests `dists/resolute/InRelease`. If only a Noble
+source has been uploaded, or all builds are still queued, that repository
+cannot supply the requested packages yet. The final “not signed” error can
+follow a failed index download; it does not invalidate your upload-signing key.
+
+To restore APT updates while publication is pending, remove the incomplete PPA
+entry. This keeps the installed application:
+
+```sh
+sudo add-apt-repository --remove --no-update ppa:mastercrypt/uoo
+sudo apt update
+```
+
+When the correct suite has published successfully, add the PPA again using
+`add-apt-repository` as above. It should configure the **PPA repository signing
+key** and `Signed-By` information. That repository key is different from your
+personal OpenPGP upload key. Confirm the new source entry includes `Signed-By`
+and the referenced key is available before using it.
+
+For an immediate local upgrade while the repository is queued, use a verified
+DEB built for the running Ubuntu release after removing the incomplete source.
+For the Resolute package prepared in this workspace:
+
+```sh
+sudo apt install ./dist/ppa-resolute/binary/uoo-boot-manager_2.2.0-0ppa1~resolute1_all.deb
 ```
 
 Subsequent PPA versions are delivered through normal APT updates. To seek

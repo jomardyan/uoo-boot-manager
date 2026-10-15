@@ -22,7 +22,7 @@ public partial class MainWindow : Window
     private string _currentPage = "Overview";
     private string _optionsEntryId = "";
     private string _menuBaseline = "", _optionsBaseline = "", _firmwareBaseline = "";
-    private ComboBox _defaultEntry = new(), _entryPicker = new(), _safeBoot = new(), _menuPolicy = new(), _firmwarePicker = new();
+    private ComboBox _defaultEntry = new(), _menuEntryPicker = new(), _entryPicker = new(), _safeBoot = new(), _menuPolicy = new(), _firmwarePicker = new();
     private TextBox _timeout = new();
     private CheckBox _displayMenu = new(), _bootLog = new(), _sos = new(), _baseVideo = new(), _recovery = new();
     private ListBox _menuOrder = new(), _firmwareOrder = new(), _backups = new();
@@ -53,6 +53,7 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         PreviewKeyDown += async (_, e) =>
         {
+            if (_busy || _snapshot is null) return;
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.R) { e.Handled = true; await RefreshAsync(); }
             else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.S)
             {
@@ -210,6 +211,20 @@ public partial class MainWindow : Window
         return await RunMutationAsync(new BootRequest { Operation = BootOperation.SetEntryOptions, TargetId = entry.Id, Options = options }, "Apply entry options?", $"Entry: {entry.Description}\nSafe mode: {options.SafeBoot}\nBoot log: {options.BootLog}\nShow driver names: {options.Sos}\nBasic video: {options.BaseVideo}\nRecovery: {options.RecoveryEnabled}\nBoot menu style: {options.MenuPolicy}");
     }
     internal async Task<bool> ApplyFirmwareOrderAsync() => await RunMutationAsync(new BootRequest { Operation = BootOperation.SetFirmwareOrder, Order = _firmwareOrder.Items.OfType<FirmwareEntry>().Select(x => x.Id).ToList() }, "Apply firmware boot order?", "The firmware will try entries in this order:\n\n" + string.Join("\n", _firmwareOrder.Items.OfType<FirmwareEntry>().Select((x, i) => $"{i + 1}. {x.Description}")));
+
+    private void IncludeMenuEntry()
+    {
+        if (_menuEntryPicker.SelectedItem is not BootEntry entry) return;
+        if (!_menuOrder.Items.OfType<BootEntry>().Any(x => x.Id == entry.Id)) _menuOrder.Items.Add(entry);
+        _menuOrder.SelectedItem = entry;
+    }
+    private void ExcludeMenuEntry()
+    {
+        if (_menuOrder.SelectedItem is not BootEntry entry) return;
+        if (entry.IsCurrent || (_defaultEntry.SelectedItem as BootEntry)?.Id == entry.Id || _menuOrder.Items.Count <= 1)
+        { ShowError("Keep the running Windows entry and the selected default in the boot menu."); return; }
+        _menuOrder.Items.Remove(entry);
+    }
 
     private void Move(ListBox list, int delta)
     {

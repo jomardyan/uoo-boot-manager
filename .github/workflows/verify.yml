@@ -30,6 +30,7 @@ jobs:
     outputs:
       version: ${{ steps.metadata.outputs.version }}
       epoch: ${{ steps.metadata.outputs.epoch }}
+      ubuntu_matrix: ${{ steps.compatibility-matrix.outputs.matrix }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,8 +54,22 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            dpkg-dev grub2-common python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+            dpkg-dev distro-info-data grub2-common python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
             desktop-file-utils xvfb xauth dbus-x11 fonts-dejavu-core
+      - name: Discover supported compatible Ubuntu releases
+        id: compatibility-matrix
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          rows = subprocess.check_output(['python3', 'scripts/build-ppa-source.py', '--list-series'], text=True).splitlines()
+          versions = [row.split('\tUbuntu ', 1)[1] for row in rows]
+          if not versions:
+              raise SystemExit('No compatible supported Ubuntu releases found')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('matrix=' + json.dumps({'ubuntu': versions}) + '\n')
+          PY
       - name: Build and validate Debian package
         run: |
           bash scripts/build-deb.sh
@@ -80,6 +95,40 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+  ubuntu-compatibility:
+    name: Same Debian package on Ubuntu ${{ matrix.ubuntu }}
+    needs: package-and-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.package-and-tests.outputs.ubuntu_matrix) }}
+    container:
+      image: ubuntu:${{ matrix.ubuntu }}
+    steps:
+      - name: Install desktop verification tools
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git dpkg-dev python3-gi python3-gi-cairo \
+            gir1.2-gtk-4.0 gir1.2-adw-1 xvfb xauth dbus-x11 fonts-dejavu-core
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist/ubuntu-compatibility
+      - name: Verify, install, and start the same architecture-independent DEB
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: |
+          python3 scripts/check-package.py dist/ubuntu-compatibility/*.deb
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ./dist/ubuntu-compatibility/*.deb
+          dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /usr/bin/uoo-boot-manager
+          /usr/bin/uoo-boot-inspect --probe
 
   rpm:
     name: Build and test Fedora RPM
@@ -415,7 +464,7 @@ jobs:
 
   collect:
     name: Collect packages and SHA256 checksums
-    needs: [package-and-tests, rpm, opensuse, arch, appimage, arm64-desktop, flatpak, snap]
+    needs: [package-and-tests, ubuntu-compatibility, rpm, opensuse, arch, appimage, arm64-desktop, flatpak, snap]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

@@ -185,10 +185,7 @@ internal static class WindowsMachine
 
     public static string EfiPath(EspPartition partition, string loader)
     {
-        if (loader.Length is < 10 or > 240 || !loader.StartsWith(@"\EFI\", StringComparison.OrdinalIgnoreCase) ||
-            !loader.EndsWith(".efi", StringComparison.OrdinalIgnoreCase) || loader.Any(c => !char.IsAsciiLetterOrDigit(c) && !"\\_- .()+".Contains(c)) ||
-            loader.Split('\\').Skip(1).Any(p => p.Length == 0 || p is "." or ".." || p.EndsWith(' ') || p.EndsWith('.')))
-            throw new ArgumentException("Choose an existing EFI application under \\EFI with a .efi extension.");
+        BootValidation.ValidateEfiLoaderPath(loader);
         var full = Path.Combine(partition.Volume, loader.TrimStart('\\'));
         SafePath(full);
         var info = new FileInfo(full);
@@ -214,6 +211,12 @@ internal static class WindowsMachine
                 architecture == Architecture.X64 && header.CoffHeader.Machine != Machine.Amd64 ||
                 architecture == Architecture.Arm64 && header.CoffHeader.Machine != Machine.Arm64)
                 throw new ArgumentException("EFI application does not match this Windows machine's architecture.");
+            if (header.PEHeader.SizeOfHeaders <= 0 || header.PEHeader.SizeOfHeaders > stream.Length ||
+                header.PEHeader.SizeOfImage <= 0 || header.SectionHeaders.Any(section =>
+                    section.SizeOfRawData < 0 || section.PointerToRawData < 0 ||
+                    section.SizeOfRawData > 0 && (section.PointerToRawData < header.PEHeader.SizeOfHeaders ||
+                        (long)section.PointerToRawData + section.SizeOfRawData > stream.Length)))
+                throw new ArgumentException("EFI application contains truncated or invalid section data.");
         }
         catch (BadImageFormatException error) { throw new ArgumentException("EFI application has an invalid or truncated PE image.", error); }
     }

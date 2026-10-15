@@ -46,7 +46,7 @@ public sealed class WindowsBootService : IBootService
             if (!string.IsNullOrEmpty(request.FilePath)) throw new ArgumentException("Privileged file import/export is disabled. Pass configuration JSON through the desktop broker.");
             token.ThrowIfCancellationRequested();
             if (request.Operation == BootOperation.ExportConfiguration)
-                return new() { Success = true, Snapshot = before, Message = "Configuration exported.", ConfigurationJson = Export(before) };
+                return new() { Success = true, Snapshot = before, Message = "Configuration exported.", ConfigurationJson = BootConfiguration.Export(before) };
             if (request.Operation == BootOperation.DeleteBackup)
             { backups.Delete(request.BackupId); return new() { Success = true, Snapshot = Inspect(bcd), Message = "Backup deleted." }; }
             if (request.Operation == BootOperation.CreateBackup)
@@ -81,17 +81,11 @@ public sealed class WindowsBootService : IBootService
                 ValidateFirmwareRecreation(new(target.Id, target.Type, target.Text(Bcd.Description), target.Text(Bcd.Path), target.Device, partition.Volume));
             }
             if (request.Operation == BootOperation.DeleteEntry)
-            {
-                var target = Bcd.Id(request.TargetId);
-                var referenced = bcd.Enumerate().Where(record => record.Id != Bcd.Manager && record.Id != target).Any(record =>
-                    record.Elements.Any(element => ((element.Key >> 24) & 0x0f) == 3 && string.Equals(element.Value as string, target, StringComparison.OrdinalIgnoreCase) ||
-                        ((element.Key >> 24) & 0x0f) == 4 && (element.Value as string[] ?? []).Contains(target, StringComparer.OrdinalIgnoreCase)));
-                if (referenced) throw new ArgumentException("Another Windows recovery or boot object references this entry. Its registration cannot be deleted.");
-            }
+                ValidateEntryDeletion(bcd.Enumerate(), request.TargetId);
             if (request.Operation == BootOperation.RestoreBackup)
             { restore = backups.Read(request.BackupId); ValidateRestore(bcd, restore, false); }
             if (request.Operation == BootOperation.ImportConfiguration)
-                configuration = Import(request.ConfigurationJson, before);
+                configuration = BootConfiguration.Parse(request.ConfigurationJson, before);
             if (request.Operation == BootOperation.SetMenu)
                 WindowsMachine.ValidateWindowsLoader(bcd.Read(request.Menu!.DefaultId));
             if (request.Operation == BootOperation.SetBootOnce)
@@ -194,6 +188,18 @@ public sealed class WindowsBootService : IBootService
         finally { own?.Dispose(); }
     }
 
+    internal static void ValidateEntryDeletion(IEnumerable<BcdRecord> records, string targetId)
+    {
+        var target = Bcd.Id(targetId);
+        // Only display-order references are removed by DeleteEntry. Other manager
+        // references, including every item in a multi-entry boot sequence, must survive.
+        var referenced = records.Where(record => record.Id != target).Any(record => record.Elements.Any(element =>
+            !(record.Id == Bcd.Manager && element.Key == Bcd.Order) &&
+            (((element.Key >> 24) & 0x0f) == 3 && string.Equals(element.Value as string, target, StringComparison.OrdinalIgnoreCase) ||
+             ((element.Key >> 24) & 0x0f) == 4 && (element.Value as string[] ?? []).Contains(target, StringComparer.OrdinalIgnoreCase))));
+        if (referenced) throw new ArgumentException("Another Windows recovery or boot object references this entry. Its registration cannot be deleted.");
+    }
+
     private static BootEntryOptions ReadOptions(BcdRecord entry) => new()
     {
         SafeBoot = !entry.Elements.ContainsKey(Bcd.SafeBoot) ? "Off" : entry.Flag(0x26000081) ? "AlternateShell" : entry.Number(Bcd.SafeBoot) == 1 ? "Network" : "Minimal",
@@ -243,7 +249,7 @@ public sealed class WindowsBootService : IBootService
             BootOperation.AddFirmwareEntry => after.Firmware.Entries.Where(e => before.Firmware.Entries.All(old => old.Id != e.Id)).ToList() is var added && added.Count == 1 &&
                 added[0].Description == BootValidation.Description(request.Description) && added[0].Path.Equals(request.EfiLoaderPath, StringComparison.OrdinalIgnoreCase) && after.Firmware.Order.Contains(added[0].Id),
             BootOperation.DeleteFirmwareEntry => after.Firmware.Entries.All(e => e.Id != Bcd.Id(request.TargetId)) && !after.Firmware.Order.Contains(Bcd.Id(request.TargetId)),
-            BootOperation.ImportConfiguration => CheckConfiguration(Import(request.ConfigurationJson, before), after) && after.Menu.BootOnceId == before.Menu.BootOnceId,
+            BootOperation.ImportConfiguration => CheckConfiguration(BootConfiguration.Parse(request.ConfigurationJson, before), after) && after.Menu.BootOnceId == before.Menu.BootOnceId,
             BootOperation.Repair => after.Menu.DefaultId == before.Menu.DefaultId && after.Menu.Timeout == before.Menu.Timeout &&
                 after.Menu.DisplayMenu == before.Menu.DisplayMenu && Same(after.Menu.Order, before.Menu.Order) && after.Menu.BootOnceId == before.Menu.BootOnceId && Same(after.Firmware.Order, before.Firmware.Order),
             _ => true
@@ -452,34 +458,4 @@ public sealed class WindowsBootService : IBootService
                 "; actual " + string.Join(",", firmware.Ids(Bcd.Sequence)) + ".");
     }
 
-    private static string Export(BootSnapshot state) => JsonSerializer.Serialize(new WindowsConfiguration {
-        Menu = state.Menu with { BootOnceId = "" }, Entries = state.Entries.Where(e => e.IsWindows).Select(e => new ConfigurationEntry { Id = e.Id, Description = e.Description, Options = e.Options }).ToList() }, BootJson.Options);
-    private static WindowsConfiguration Import(string json, BootSnapshot snapshot)
-    {
-        if (json.Length is < 2 or > 256 * 1024) throw new ArgumentException("Configuration JSON must be smaller than 256 KiB.");
-        using var document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 16 });
-        static void DuplicateCheck(JsonElement element)
-        {
-            if (element.ValueKind == JsonValueKind.Object)
-            {
-                HashSet<string> names = []; foreach (var property in element.EnumerateObject())
-                { if (!names.Add(property.Name)) throw new ArgumentException("Configuration JSON contains duplicate properties."); DuplicateCheck(property.Value); }
-            }
-            else if (element.ValueKind == JsonValueKind.Array) foreach (var child in element.EnumerateArray()) DuplicateCheck(child);
-        }
-        DuplicateCheck(document.RootElement);
-        var config = JsonSerializer.Deserialize<WindowsConfiguration>(json, BootJson.Options) ?? throw new ArgumentException("Configuration JSON is empty.");
-        if (config.Format != "uoo-windows-configuration" || config.Version != 1 || config.Menu is null || config.Entries is null ||
-            config.Entries.Count is < 1 or > 128 || config.Entries.Any(e => e is null || e.Options is null || e.Description is null || e.Id is null) ||
-            config.Entries.Select(e => e.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != config.Entries.Count)
-            throw new ArgumentException("Unsupported or malformed Uoo Windows configuration.");
-        BootValidation.ValidateMenu(config.Menu, snapshot);
-        if (config.Menu.BootOnceId.Length != 0) throw new ArgumentException("Imported configuration cannot schedule a one-time boot.");
-        foreach (var entry in config.Entries)
-        {
-            if (!snapshot.Entries.Any(e => e.IsWindows && e.Id.Equals(Bcd.Id(entry.Id), StringComparison.OrdinalIgnoreCase))) throw new ArgumentException("Configuration references a Windows entry that is no longer available.");
-            BootValidation.Description(entry.Description); BootValidation.ValidateOptions(entry.Options);
-        }
-        return config;
-    }
 }

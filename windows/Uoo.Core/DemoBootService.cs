@@ -46,9 +46,8 @@ public sealed class DemoBootService : IBootService
             if (request.Operation == BootOperation.Inspect) return Response("Demo boot settings loaded.");
             if (request.Operation == BootOperation.ExportConfiguration)
             {
-                var data = new WindowsConfiguration { Menu = state.Menu with { BootOnceId = "" }, Entries = state.Entries.Select(x => new ConfigurationEntry { Id = x.Id, Description = x.Description, Options = x.Options }).ToList() };
-                var json = JsonSerializer.Serialize(data, BootJson.Options);
-                if (!string.IsNullOrWhiteSpace(request.FilePath)) await File.WriteAllTextAsync(request.FilePath, json, cancellationToken);
+                var json = BootConfiguration.Export(state);
+                if (!string.IsNullOrWhiteSpace(request.FilePath)) await BootConfiguration.WriteFileAsync(request.FilePath, json, cancellationToken);
                 return Response("Demo configuration exported.") with { ConfigurationJson = json };
             }
             WindowsConfiguration? imported = null;
@@ -56,26 +55,8 @@ public sealed class DemoBootService : IBootService
             {
                 string json = request.ConfigurationJson;
                 if (!string.IsNullOrWhiteSpace(request.FilePath))
-                {
-                    var file = new FileInfo(request.FilePath);
-                    if (file.Length > 1024 * 1024) throw new ArgumentException("Configuration files must be smaller than 1 MiB.");
-                    json = await File.ReadAllTextAsync(request.FilePath, cancellationToken);
-                }
-                BootJson.RejectDuplicateProperties(json);
-                imported = JsonSerializer.Deserialize<WindowsConfiguration>(json, BootJson.Options)
-                    ?? throw new ArgumentException("Choose a Windows Uoo configuration file.");
-                if (imported.Version != 1 || imported.Format != "uoo-windows-configuration") throw new ArgumentException("Choose a version 1 Windows Uoo configuration file.");
-                if (imported.Menu is null || imported.Menu.BootOnceId is null || imported.Menu.BootOnceId.Length != 0)
-                    throw new ArgumentException("Imported configuration cannot schedule a one-time boot.");
-                BootValidation.ValidateMenu(imported.Menu, state);
-                if (imported.Entries is null || imported.Entries.Count is < 1 or > 128 || imported.Entries.Any(x => x is null) || imported.Entries.Select(x => x.Id).Distinct(StringComparer.OrdinalIgnoreCase).Count() != imported.Entries.Count)
-                    throw new ArgumentException("Invalid imported entries.");
-                foreach (var entry in imported.Entries)
-                {
-                    BootValidation.Id(entry.Id); BootValidation.Description(entry.Description); BootValidation.ValidateOptions(entry.Options);
-                    if (!state.Entries.Any(x => string.Equals(x.Id, entry.Id, StringComparison.OrdinalIgnoreCase))) throw new ArgumentException("Configuration contains entries from a different machine.");
-                }
-                imported = imported with { Menu = imported.Menu with { DefaultId = BootValidation.Id(imported.Menu.DefaultId), Order = imported.Menu.Order.Select(BootValidation.Id).ToList() }, Entries = imported.Entries.Select(x => x with { Id = BootValidation.Id(x.Id) }).ToList() };
+                    json = await BootConfiguration.ReadFileAsync(request.FilePath, cancellationToken);
+                imported = BootConfiguration.Parse(json, state);
             }
             if (request.Operation == BootOperation.RestoreBackup && createdFirmware.TryGetValue(request.BackupId, out var undo) &&
                 (state.Firmware.BootOnceId == undo || state.Firmware.CurrentId == undo))
@@ -123,14 +104,16 @@ public sealed class DemoBootService : IBootService
                     var restored = BootJson.Clone(backups[request.BackupId]);
                     string removedId = createdFirmware.GetValueOrDefault(request.BackupId, "");
                     var inventory = restored.Firmware.Entries.Concat(state.Firmware.Entries).Where(x => x.Id != removedId).DistinctBy(x => x.Id).ToList();
-                    var order = restored.Firmware.Order.Concat(state.Firmware.Order).Where(x => x != removedId).Distinct().ToList();
+                    var known = restored.Firmware.Entries.Select(x => x.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var order = restored.Firmware.Order.Concat(state.Firmware.Order.Where(x => !known.Contains(x)))
+                        .Where(x => x != removedId).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     state = restored with { Backups = state.Backups, Firmware = restored.Firmware with { Entries = inventory, Order = order } };
                     message = "Demo backup restored; the previous state was backed up first."; break;
                 case BootOperation.DeleteBackup:
                     backups.Remove(request.BackupId); createdFirmware.Remove(request.BackupId); state.Backups.RemoveAll(x => x.Id == request.BackupId); message = "Demo backup deleted."; break;
                 case BootOperation.ImportConfiguration:
                     state = state with { Menu = BootJson.Clone(imported!.Menu) with { BootOnceId = state.Menu.BootOnceId }, Entries = state.Entries.Select(x =>
-                    { var model = imported.Entries.SingleOrDefault(e => e.Id == x.Id); return model is null ? x : x with { Description = model.Description, Options = BootJson.Clone(model.Options), IsDefault = x.Id == imported.Menu.DefaultId }; }).ToList() };
+                    { var model = imported.Entries.SingleOrDefault(e => e.Id == x.Id); return (model is null ? x : x with { Description = model.Description, Options = BootJson.Clone(model.Options) }) with { IsDefault = x.Id == imported.Menu.DefaultId }; }).ToList() };
                     message = "Demo Windows configuration imported."; break;
                 case BootOperation.Repair:
                     message = "Demo repair completed. A recovery backup was created. No real boot files changed."; break;

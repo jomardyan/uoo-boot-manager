@@ -25,8 +25,7 @@ public sealed class ElevatedBootService : IBootService
             string filePath = request.FilePath;
             if (request.Operation == BootOperation.ImportConfiguration && !string.IsNullOrWhiteSpace(filePath))
             {
-                if (new FileInfo(filePath).Length > 1024 * 1024) throw new InvalidDataException("Configuration files must be smaller than 1 MiB.");
-                request = request with { FilePath = "", ConfigurationJson = await File.ReadAllTextAsync(filePath, cancellationToken) };
+                request = request with { FilePath = "", ConfigurationJson = await BootConfiguration.ReadFileAsync(filePath, cancellationToken) };
             }
             if (request.Operation == BootOperation.ExportConfiguration) request = request with { FilePath = "" };
             if (request.Operation == BootOperation.Inspect && request.Confirmation != "ADMIN")
@@ -65,7 +64,7 @@ public sealed class ElevatedBootService : IBootService
             if (response.Success && request.Operation == BootOperation.ExportConfiguration && !string.IsNullOrWhiteSpace(filePath))
             {
                 if (string.IsNullOrWhiteSpace(response.ConfigurationJson)) throw new InvalidDataException("The helper did not return a configuration to export.");
-                await File.WriteAllTextAsync(filePath, response.ConfigurationJson, cancellationToken);
+                await BootConfiguration.WriteFileAsync(filePath, response.ConfigurationJson, cancellationToken);
             }
             return response;
         }

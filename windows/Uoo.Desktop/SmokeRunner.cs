@@ -94,6 +94,14 @@ public partial class MainWindow
         Navigate("Diagnostics"); Navigate("Windows boot"); Check(_timeout.Text == "17", "Navigation preserves boot menu drafts");
         Check(await ApplyMenuAsync(), "Apply Windows boot menu");
         Check(Snapshot.Menu.Timeout == 17 && !Snapshot.Menu.DisplayMenu, "Saved menu matches controls"); Check(!HasDrafts, "Successful apply clears drafts");
+        _menuOrder.SelectedIndex = 0; ExcludeMenuEntry();
+        Check(_menuOrder.Items.Count == 2 && !HasDrafts, "Running Windows stays in the menu");
+        _menuOrder.SelectedIndex = 1; ExcludeMenuEntry();
+        Check(HasDrafts && await ApplyMenuAsync(), "Apply exclusion of a Windows menu entry");
+        Check(Snapshot.Entries.Count == 2 && Snapshot.Menu.Order.Count == 1, "Exclusion retains the Windows registration");
+        _menuEntryPicker.SelectedItem = _menuEntryPicker.Items.OfType<BootEntry>().Single(e => e.Id == DemoBootService.OtherWindowsId);
+        IncludeMenuEntry(); IncludeMenuEntry();
+        Check(_menuOrder.Items.Count == 2 && await ApplyMenuAsync(), "Re-include a hidden entry without duplicates");
         _menuOrder.SelectedIndex = 1; Move(_menuOrder, -1); Check(await ApplyMenuAsync(), "Apply reordered Windows entries");
         Check(Snapshot.Menu.Order[0] == DemoBootService.OtherWindowsId, "Windows boot order persisted");
         Navigate("Entry options"); _safeBoot.SelectedItem = "Network"; _bootLog.IsChecked = true; _sos.IsChecked = true; _baseVideo.IsChecked = true; _menuPolicy.SelectedItem = "Legacy";

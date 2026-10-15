@@ -29,6 +29,13 @@ public static partial class BootValidation
             throw new ArgumentException("Boot menu style must be Standard or Legacy.");
     }
 
+    public static void ValidateEfiLoaderPath(string loader)
+    {
+        if (loader is null || loader.Length is < 10 or > 240 || !EfiPath().IsMatch(loader) ||
+            loader.Split('\\').Skip(1).Any(p => p.Length == 0 || p is "." or ".." || p.EndsWith(' ') || p.EndsWith('.')))
+            throw new ArgumentException(@"Choose an existing EFI application under \EFI with a .efi extension.");
+    }
+
     public static void ValidateMenu(BootMenuSettings menu, BootSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(menu);
@@ -63,6 +70,8 @@ public static partial class BootValidation
             throw new ArgumentException("Boot settings have changed. Reload and review them before applying this change.");
         if (request.Operation is BootOperation.SetMenu)
             ValidateMenu(request.Menu ?? throw new ArgumentException("Choose boot menu settings."), snapshot);
+        if (request.Operation == BootOperation.CreateBackup && !string.IsNullOrWhiteSpace(request.Description))
+            Description(request.Description);
         if (request.Operation is BootOperation.RenameEntry or BootOperation.CopyEntry or BootOperation.AddFirmwareEntry)
             Description(request.Description);
         if (request.Operation is BootOperation.SetEntryOptions or BootOperation.RenameEntry or BootOperation.CopyEntry or BootOperation.DeleteEntry or BootOperation.SetBootOnce)
@@ -103,8 +112,7 @@ public static partial class BootValidation
         }
         if (request.Operation is BootOperation.AddFirmwareEntry)
         {
-            if (!EfiPath().IsMatch(request.EfiLoaderPath ?? "") || request.EfiLoaderPath!.Split('\\').Any(x => x is "." or ".."))
-                throw new ArgumentException(@"Choose an existing EFI loader path such as \EFI\ubuntu\shimx64.efi.");
+            ValidateEfiLoaderPath(request.EfiLoaderPath);
             if (!DriveRoot().IsMatch(request.EfiPartition ?? "") && !VolumeRoot().IsMatch(request.EfiPartition ?? ""))
                 throw new ArgumentException(@"Choose a local EFI system partition, such as S:\ or its volume GUID path.");
         }
@@ -120,7 +128,7 @@ public static partial class BootValidation
         {
             if (request.FilePath is null || request.FilePath.Length > 1024 || request.FilePath.Any(char.IsControl))
                 throw new ArgumentException("Choose a configuration JSON file.");
-            if (request.ConfigurationJson is null || request.ConfigurationJson.Length > 1024 * 1024)
+            if (request.ConfigurationJson is null || System.Text.Encoding.UTF8.GetByteCount(request.ConfigurationJson) > BootConfiguration.MaximumBytes)
                 throw new ArgumentException("Configuration files must be smaller than 1 MiB.");
             if (request.Operation == BootOperation.ImportConfiguration && string.IsNullOrWhiteSpace(request.FilePath) && string.IsNullOrWhiteSpace(request.ConfigurationJson))
                 throw new ArgumentException("Choose a Windows configuration JSON file.");
@@ -133,12 +141,12 @@ public static partial class BootValidation
         }
     }
 
-    [GeneratedRegex(@"^\\EFI\\[A-Za-z0-9 _().+\\-]+\.efi$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\\EFI\\[A-Za-z0-9 _().+\\-]+\.efi\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex EfiPath();
-    [GeneratedRegex(@"^[A-Za-z]:\\$")]
+    [GeneratedRegex(@"^[A-Za-z]:\\\z")]
     private static partial Regex DriveRoot();
-    [GeneratedRegex(@"^\\\\\?\\Volume\{[0-9a-fA-F-]{36}\}\\$")]
+    [GeneratedRegex(@"^\\\\\?\\Volume\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}\\\z")]
     private static partial Regex VolumeRoot();
-    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$")]
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9_-]{0,95}\z")]
     private static partial Regex BackupId();
 }

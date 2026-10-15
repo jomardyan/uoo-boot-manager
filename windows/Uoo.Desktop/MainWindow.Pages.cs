@@ -46,12 +46,18 @@ public partial class MainWindow
         var orderButtons = Ui.WrapActions();
         orderButtons.Children.Add(Ui.Button("Move up", () => Move(_menuOrder, -1)));
         orderButtons.Children.Add(Ui.Button("Move down", () => Move(_menuOrder, 1)));
+        orderButtons.Children.Add(Ui.Button("Exclude selected", ExcludeMenuEntry));
         orderButtons.Children.Add(Ui.Button("Entry options", () =>
         {
             if (_menuOrder.SelectedItem is BootEntry entry) SelectOptionsEntry(entry.Id);
             Navigate("Entry options");
         }));
-        page.Children.Add(Ui.Card("Boot order", _menuOrder, orderButtons));
+        _menuEntryPicker = new ComboBox { ItemsSource = Snapshot.Entries.ToList(), SelectedIndex = Snapshot.Entries.Count > 0 ? 0 : -1 };
+        Ui.Name(_menuEntryPicker, "Registered boot entry");
+        var include = Ui.WrapActions();
+        include.Children.Add(Ui.Button("Include in boot menu", IncludeMenuEntry));
+        page.Children.Add(Ui.Card("Boot order", _menuOrder, orderButtons,
+            Ui.Text("Include or exclude registered entries without deleting them. Apply boot settings to save the menu."), _menuEntryPicker, include));
         var once = Ui.WrapActions(); once.Children.Add(Ui.Button("Use selected entry once", async () => await SetOnceAsync(false, false)));
         var clear = Ui.Button("Clear next boot", async () => await SetOnceAsync(false, true)); clear.IsEnabled = Snapshot.Menu.BootOnceId.Length > 0; once.Children.Add(clear);
         page.Children.Add(Ui.Card("Next Windows boot", Ui.Text(EntryName(Snapshot.Menu.BootOnceId, false)), once));

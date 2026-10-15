@@ -87,7 +87,7 @@ help:
 	  "$${uoo_cyan}  make checksums$${uoo_reset}    Generate dist/SHA256SUMS for existing Linux packages" \
 	  "$${uoo_cyan}  make verify-checksums$${uoo_reset}  Verify the existing Linux checksum manifest" \
 	  "$${uoo_cyan}  make windows$${uoo_reset}      Build Windows ZIP; also build installer on Windows" \
-	  "$${uoo_cyan}  make windows-test$${uoo_reset} Run portable .NET model/protocol tests" \
+	  "$${uoo_cyan}  make windows-test$${uoo_reset} Run portable .NET model/platform tests" \
 	  "$${uoo_cyan}  make vm-test$${uoo_reset}      Build Debian and exercise it in a disposable Ubuntu VM" \
 	  "$${uoo_cyan}  make clean$${uoo_reset}        Delete build/ staging (including cached build tools)" \
 	  "$${uoo_cyan}  make distclean$${uoo_reset}    Delete build/ and dist/ outputs" \
@@ -205,6 +205,7 @@ windows:
 windows-test:
 	$(task_status)
 	"$(DOTNET)" run --project windows/Uoo.Tests -c Release
+	"$(DOTNET)" run --project windows/Uoo.Platform.Tests -c Release -- --portable
 
 vm-test: check-package
 	$(task_status)

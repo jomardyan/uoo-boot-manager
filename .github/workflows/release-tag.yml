@@ -1,0 +1,53 @@
+name: Create requested release tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: "startsWith(github.event.head_commit.message, 'release: v')"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Validate version, create immutable tag, and dispatch release builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(python3 scripts/package-version.py)"
+          windows_version="$(python3 -c 'from xml.etree import ElementTree as E; print(E.parse("windows/Directory.Build.props").findtext(".//Version"))')"
+          requested="${HEAD_MESSAGE%%$'\n'*}"
+          if [[ "$windows_version" != "$version" || "$requested" != "release: v$version" ]]; then
+            printf 'Release request must match the Linux and Windows versions: release: v%s\n' "$version" >&2
+            exit 1
+          fi
+          tag="v$version"
+          existing="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)"
+          if [[ -n "$existing" ]]; then
+            if [[ "$existing" != "$GITHUB_SHA" ]]; then
+              printf 'Refusing to move existing tag %s to another commit.\n' "$tag" >&2
+              exit 1
+            fi
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null
+          fi
+          # Token-created tag pushes do not trigger workflows; dispatch both explicitly.
+          gh workflow run verify.yml --ref "$tag"
+          gh workflow run windows.yml --ref "$tag"

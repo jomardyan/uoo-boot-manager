@@ -450,7 +450,7 @@ jobs:
 
   release:
     name: Attach packages to draft release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/tags/v')
     needs: [package-and-tests, collect]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

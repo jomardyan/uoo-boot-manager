@@ -96,11 +96,18 @@ git tag v2.1.2
 git push origin v2.1.2
 ```
 
+Alternatively, push a commit on `main` whose first line is `release: v2.1.2`
+after synchronizing those version files. **Create requested release tag**
+checks the requested version, creates the tag at that exact commit, and
+dispatches both package workflows on it. It refuses to move an existing tag
+to another commit. This uses the repository token without additional secrets.
+
 The workflow rejects a mismatched tag or metadata version. All tests and all
 package builds and architecture checks must pass before the workflow creates a **draft** GitHub
 release and attaches the packages and checksums. Review and publish the draft
 from GitHub Releases. For a combined release, wait for both the Linux and
-Windows package workflows to succeed before publishing. Only the release job receives `contents: write`; the
+Windows package workflows to succeed before publishing. Only tag-creation and
+release jobs receive `contents: write`; the
 normal build jobs use read access. No additional repository secrets are needed.
 Rerunning a tag build can update its draft, but cannot overwrite a published
 release's assets.

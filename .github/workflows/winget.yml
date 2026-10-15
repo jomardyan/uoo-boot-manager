@@ -41,9 +41,22 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
-            Install-Module Microsoft.WinGet.Client -Repository PSGallery -Force -Scope CurrentUser
-            Import-Module Microsoft.WinGet.Client
-            Repair-WinGetPackageManager -AllUsers
+            # The ARM runner has no App Installer. Install Microsoft's pinned
+            # signed bundle and native dependencies without a Store login.
+            $base = 'https://github.com/microsoft/winget-cli/releases/download/v1.29.380/'
+            $downloads = @{
+              'DesktopAppInstaller_Dependencies.zip' = 'BA875AFE9D190F61218985AC0292A99D1DB710BF93E13C68944CA9D89F0D82D1'
+              'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle' = '65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E'
+            }
+            foreach ($name in $downloads.Keys) {
+              $destination = Join-Path $env:RUNNER_TEMP $name
+              Invoke-WebRequest ($base + $name) -OutFile $destination
+              if ((Get-FileHash $destination -Algorithm SHA256).Hash -ne $downloads[$name]) { throw "Microsoft download hash mismatch: $name" }
+            }
+            $dependencies = Join-Path $env:RUNNER_TEMP 'winget-dependencies'
+            Expand-Archive (Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies.zip') $dependencies
+            $native = @(Get-ChildItem (Join-Path $dependencies '${{ matrix.arch }}') -Filter '*.appx' | ForEach-Object FullName)
+            Add-AppxPackage -Path (Join-Path $env:RUNNER_TEMP 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle') -DependencyPath $native
           }
           $command = Get-Command winget -ErrorAction SilentlyContinue
           if ($command) {

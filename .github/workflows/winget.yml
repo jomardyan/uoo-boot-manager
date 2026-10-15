@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: winget-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     name: WinGet ${{ matrix.arch }} install and uninstall
@@ -69,6 +73,11 @@ jobs:
           "UOO_WINGET=$client" >> $env:GITHUB_ENV
           & $client --version
           if ($LASTEXITCODE -ne 0) { throw 'WinGet did not start.' }
+          # Hosted Server runners can stall on Delivery Optimization. Use the
+          # documented WinINet downloader for this disposable test account.
+          $settings = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState'
+          New-Item -ItemType Directory -Path $settings -Force | Out-Null
+          '{"network":{"downloader":"wininet"}}' | Set-Content (Join-Path $settings 'settings.json') -Encoding utf8
       - name: Validate and install the published native installer
         run: |
           $ErrorActionPreference = 'Stop'

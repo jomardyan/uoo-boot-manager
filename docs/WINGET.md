@@ -73,8 +73,7 @@ performs schema/install/uninstall checks on disposable native x64 and ARM64
 runners, without submitting a community PR or changing boot configuration.
 [Microsoft local-manifest instructions](https://learn.microsoft.com/en-us/windows/package-manager/winget/install#local-install)
 
-The published 2.2.0 installer registers the name **Uoo Boot Manager version
-2.2.0** in Windows Apps & features. The manifest records that exact name and
+The published 2.2.0 installer registers the name **Uoo Boot Manager 2.2.0** in Windows Apps & features. The manifest records that exact name and
 version; the product-code uninstall command also works before catalog
 publication. [Microsoft uninstall options](https://learn.microsoft.com/en-us/windows/package-manager/winget/uninstall)
 

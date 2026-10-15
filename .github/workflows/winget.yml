@@ -44,24 +44,22 @@ jobs:
       - name: Prepare Microsoft WinGet client
         run: |
           $ErrorActionPreference = 'Stop'
-          if (!(Get-Command winget -ErrorAction SilentlyContinue)) {
-            # The ARM runner has no App Installer. Install Microsoft's pinned
-            # signed bundle and native dependencies without a Store login.
-            $base = 'https://github.com/microsoft/winget-cli/releases/download/v1.29.380/'
-            $downloads = @{
-              'DesktopAppInstaller_Dependencies.zip' = 'BA875AFE9D190F61218985AC0292A99D1DB710BF93E13C68944CA9D89F0D82D1'
-              'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle' = '65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E'
-            }
-            foreach ($name in $downloads.Keys) {
-              $destination = Join-Path $env:RUNNER_TEMP $name
-              Invoke-WebRequest ($base + $name) -OutFile $destination
-              if ((Get-FileHash $destination -Algorithm SHA256).Hash -ne $downloads[$name]) { throw "Microsoft download hash mismatch: $name" }
-            }
-            $dependencies = Join-Path $env:RUNNER_TEMP 'winget-dependencies'
-            Expand-Archive (Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies.zip') $dependencies
-            $native = @(Get-ChildItem (Join-Path $dependencies '${{ matrix.arch }}') -Filter '*.appx' | ForEach-Object FullName)
-            Add-AppxPackage -Path (Join-Path $env:RUNNER_TEMP 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle') -DependencyPath $native -ForceApplicationShutdown
+          # Use the same pinned Microsoft client on both native architectures.
+          # Install its signed bundle and dependencies without a Store login.
+          $base = 'https://github.com/microsoft/winget-cli/releases/download/v1.29.380/'
+          $downloads = @{
+            'DesktopAppInstaller_Dependencies.zip' = 'BA875AFE9D190F61218985AC0292A99D1DB710BF93E13C68944CA9D89F0D82D1'
+            'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle' = '65DEA9C01CE08EE7B763366B27C0E651F97DB857C11CA9B9C301826C10092F2E'
           }
+          foreach ($name in $downloads.Keys) {
+            $destination = Join-Path $env:RUNNER_TEMP $name
+            Invoke-WebRequest ($base + $name) -OutFile $destination
+            if ((Get-FileHash $destination -Algorithm SHA256).Hash -ne $downloads[$name]) { throw "Microsoft download hash mismatch: $name" }
+          }
+          $dependencies = Join-Path $env:RUNNER_TEMP 'winget-dependencies'
+          Expand-Archive (Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies.zip') $dependencies
+          $native = @(Get-ChildItem (Join-Path $dependencies '${{ matrix.arch }}') -Filter '*.appx' | ForEach-Object FullName)
+          Add-AppxPackage -Path (Join-Path $env:RUNNER_TEMP 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle') -DependencyPath $native -ForceApplicationShutdown
           $command = Get-Command winget -ErrorAction SilentlyContinue
           if ($command) {
             $client = $command.Source
@@ -91,7 +89,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WinGet installation failed.' }
           $registration = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1'
           if ($registration.DisplayVersion -ne $version) { throw 'Installed version differs from the manifest.' }
-          if ($registration.DisplayName -ne "Uoo Boot Manager version $version") { throw 'Installed display name differs from AppsAndFeaturesEntries.' }
+          if ($registration.DisplayName -ne "Uoo Boot Manager $version") { throw "Unexpected installed display name: $($registration.DisplayName)" }
           foreach ($file in @('Uoo.BootManager.exe', 'Uoo.BootHelper.exe')) {
             if (!(Test-Path (Join-Path $env:ProgramFiles "Uoo Boot Manager\$file"))) { throw "Missing installed $file" }
           }

@@ -1,0 +1,19 @@
+Source: uoo-boot-manager
+Section: admin
+Priority: optional
+Maintainer: Hayk Jomardyan <jomardyan@outlook.com>
+Build-Depends: debhelper-compat (= 13), dh-python, python3 (>= 3.10)
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://github.com/jomardyan/uoo-boot-manager
+Vcs-Git: https://github.com/jomardyan/uoo-boot-manager.git
+Vcs-Browser: https://github.com/jomardyan/uoo-boot-manager
+
+Package: uoo-boot-manager
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.6), gir1.2-adw-1 (>= 1.5), polkitd, pkexec
+Recommends: grub2-common, efibootmgr
+Description: native desktop manager for Ubuntu boot settings
+ Manage GRUB menus, custom boot entries, one-time boot choices, UEFI firmware
+ options, backups, and supported bootloader repair on Ubuntu.
+ System changes use an authenticated helper and include backups.

@@ -20,9 +20,10 @@ For the Windows edition, see [Microsoft Store publishing](WINDOWS-STORE.md).
 | Include Uoo in Ubuntu's default repositories | Ubuntu archive contribution and review | Separate acceptance process; a PPA does not provide this |
 
 **Current repository status:** CI produces a binary `.deb` and classic `.snap`
-packages for `amd64` and `arm64`. Debian source packaging (`debian/`) still needs
-to be added before a PPA upload. The Snap supplies the desktop; authenticated
-boot changes require the matching native host package and its polkit helper.
+packages for `amd64` and `arm64`. Debian source packaging is provided in
+`debian/`; `scripts/build-ppa-source.py` creates an unsigned source upload for
+Ubuntu 24.04. The Snap supplies the desktop; authenticated boot changes require
+the matching native host package and its polkit helper.
 
 See [Linux packaging](PACKAGING.md) for build prerequisites, architecture
 coverage, and supported boot-management operations.
@@ -82,11 +83,17 @@ gpg --fingerprint "YOUR_LAUNCHPAD_EMAIL"
 
 Copy the **full primary-key fingerprint**, the long hexadecimal line associated
 with `pub`/`sec`, not the short key ID after the slash or a subkey fingerprint.
-Replace the placeholder below with that value:
+**Remove every space between its hexadecimal blocks** before using it in a
+command. Replace the placeholder below with that single continuous value:
 
 ```sh
 gpg --keyserver hkps://keyserver.ubuntu.com --send-keys YOUR_FULL_PRIMARY_FINGERPRINT
 ```
+
+If GnuPG prints errors such as `"0966" not a key ID: skipping` for individual
+four-character blocks, spaces caused the shell to pass separate arguments.
+Join all the blocks without spaces and run the command again. Use that same
+continuous primary fingerprint in Launchpad's Fingerprint field.
 
 This publishes the public key, including its name/email identity, to Ubuntu's
 keyserver. Keep the private key and its recovery material backed up securely.
@@ -113,57 +120,69 @@ key again cannot decrypt that email.
 See [Launchpad's OpenPGP import guide](https://ubuntu.com/docs/launchpad/user/how-to/import-openpgp-key/)
 and [GnuPG key-generation commands](https://www.gnupg.org/documentation/manuals/gnupg/OpenPGP-Key-Management.html).
 
-### Add Debian source packaging first
+### Build the source bundle
 
-Launchpad builds binaries from source; it does not accept the `.deb` produced
-by `scripts/build-deb.sh` as an upload. Prepare a source package with at least:
+Launchpad requires a source package rather than the binary `.deb` from
+`scripts/build-deb.sh`. This repository now includes `debian/control`,
+`changelog`, `rules`, `copyright`, and `source/format`. Its debhelper rules reuse
+the binary builder's staging operation and retain the protected helper paths.
 
-| File | Purpose for Uoo |
-| --- | --- |
-| `debian/control` | Source/build dependencies and binary runtime dependencies; replace the placeholder maintainer email |
-| `debian/changelog` | Package version, target suite (`noble`), changes, and maintainer identity |
-| `debian/rules` | Executable debhelper rules that stage Uoo's application and assets |
-| `debian/source/format` | Source format, normally `3.0 (quilt)` for a separate upstream release |
-| `debian/copyright` | Copyright (c) 2026 Hayk Jomardyan, MIT terms, and applicable third-party notices |
-| `debian/install` or equivalent rules | Application modules, launchers, icons, desktop entry, documentation, and fixed polkit/helper paths |
+The initial PPA revision is **2.2.0-0ppa1~noble1**, with changelog suite
+**noble**. The app itself remains version **2.2.0**. The configured maintainer
+is Hayk Jomardyan and the upload target in these examples is **mastercrypt/uoo**.
+Use your own identity/archive when adapting the packaging for another account.
 
-Use [the current binary staging script](../scripts/build-deb.sh) and
-[package control metadata](../packaging/control) as the payload reference.
-Preserve the root-owned helper and its protected permissions. A debhelper
-build must stage files into its package directory; calling the existing binary
-builder alone does not implement Debian source packaging.
-
-For `3.0 (quilt)`, prepare an upstream source archive named
-`uoo-boot-manager_2.2.0.orig.tar.gz` beside the source directory. It must match
-the upstream version and include the release sources, license, and required
-assets, excluding local build outputs. Keep Debian packaging changes under
-`debian/`, and record upstream modifications as appropriate for that format.
-
-Set the example package version to `2.2.0-0ubuntu1~noble1` and the changelog
-suite to `noble`. The suite selects the Ubuntu release; a version suffix alone
-does not. This preparation is required before the following commands work.
-[Ubuntu's new-package guide](https://ubuntu.com/project/docs/contributors/new-package/create-a-new-package/)
-
-### Build, sign, upload, and check
-
-Run from the prepared source-package directory:
+Run from the repository root:
 
 ```sh
-debuild -S -sa -kYOUR_GPG_KEY_FINGERPRINT
-
-lintian ../uoo-boot-manager_2.2.0-0ubuntu1~noble1_source.changes
-
-dput ppa:YOUR_LAUNCHPAD_ID/uoo \
-  ../uoo-boot-manager_2.2.0-0ubuntu1~noble1_source.changes
+python3 scripts/build-ppa-source.py
 ```
 
-`-S` builds source only; `-sa` includes the upstream source archive. Inspect the
-source package before uploading, resolve packaging errors, then monitor the
-PPA's build logs. Confirm the published package installs and runs on a clean
-Ubuntu 24.04 system. Increment the Debian revision for a corrected upload;
-Launchpad will not replace an accepted version. Test each additional Ubuntu
-series and use its actual changelog suite and a distinct version.
+This creates `dist/ppa/` with the upstream `.orig.tar.gz`, Debian `.debian.tar.xz`,
+`.dsc`, `.buildinfo`, and `_source.changes`. It builds an isolated snapshot of
+tracked working-tree files plus the source-packaging files, excludes local
+build/editor/hosting metadata, and checks that the resulting `.dsc` extracts.
+Review the intended sources before building; commit all release files before
+publishing. New application source files must be tracked so they are included.
+
+The build is deliberately unsigned and needs no private key. It will not
+replace an existing bundle: for another local build, use a fresh output path,
+for example `python3 scripts/build-ppa-source.py --output dist/ppa-rebuild`.
+Use that chosen path in the signing and upload commands too.
+
+### Sign, upload, and check
+
+Install `devscripts` and `dput` from the prerequisites above. Sign the existing
+bundle with the full fingerprint of the key validated on Launchpad:
+
+```sh
+debsign -k096689AA98D70F17209D36EE61902E85BBCF9FD0 \
+  dist/ppa/uoo-boot-manager_2.2.0-0ppa1~noble1_source.changes
+```
+
+Enter your key's passphrase in GnuPG's prompt. `debsign` signs the associated
+source metadata and updates the upload checksums. Then upload:
+
+```sh
+dput ppa:mastercrypt/uoo \
+  dist/ppa/uoo-boot-manager_2.2.0-0ppa1~noble1_source.changes
+```
+
+Keep all bundle files together. Uploading `_source.changes` sends the referenced
+source files; do not upload the `.deb` or a ZIP. Monitor the PPA's package/build
+pages and Launchpad email for acceptance or build errors. Once published, test
+installation on a clean Ubuntu 24.04 system.
+
+Before a corrected upload, increment the revision in `debian/changelog`, for
+example `2.2.0-0ppa1~noble2`; Launchpad does not replace accepted versions.
+For another Ubuntu series, test it and use its actual changelog suite and a
+distinct version. The current builder targets `noble` explicitly.
 [Launchpad source upload instructions](https://ubuntu.com/docs/launchpad/user/how-to/packaging/ppa-package-upload/)
+
+To test a binary build locally, install the declared build dependencies, extract
+an unsigned source bundle with `dpkg-source -x`, and run
+`dpkg-buildpackage -b -us -uc` inside the extracted source. This does not install
+the resulting package or change boot configuration.
 
 ### Give users these installation commands
 
@@ -171,7 +190,7 @@ After the PPA package has built and published:
 
 ```sh
 sudo apt install software-properties-common
-sudo add-apt-repository ppa:YOUR_LAUNCHPAD_ID/uoo
+sudo add-apt-repository ppa:mastercrypt/uoo
 sudo apt update
 sudo apt install uoo-boot-manager
 ```
@@ -324,7 +343,7 @@ Users still need the matching native host package for authenticated changes.
 - [ ] Commit the intended sources, license, icons, and packaging metadata.
 - [ ] Confirm Linux/Windows version metadata and release tag agree.
 - [ ] Run applicable build, package, and platform checks.
-- [ ] Build and test Debian source packaging before uploading to the PPA.
+- [ ] Build, verify, and sign the Debian source bundle before uploading to the PPA.
 - [ ] Confirm the PPA publishes the intended version for each supported suite.
 - [ ] Complete classic-confinement review and store metadata.
 - [ ] Test matching native helper + Snap on amd64 and arm64.

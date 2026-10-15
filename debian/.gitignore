@@ -1,0 +1,7 @@
+/.debhelper/
+/uoo-boot-manager/
+/files
+/debhelper-build-stamp
+/*.substvars
+/*.debhelper.log
+/*.debhelper

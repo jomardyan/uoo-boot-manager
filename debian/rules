@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with python3
+
+# This is a Python application with checked-in desktop assets, not a compiled
+# Make project. Do not run the root Makefile's binary-package targets here.
+override_dh_auto_configure:
+override_dh_auto_build:
+	python3 scripts/package-version.py
+
+override_dh_auto_test:
+	python3 -m unittest discover -s tests -p test_core.py -v
+
+override_dh_auto_install:
+	bash scripts/build-deb.sh --stage-only debian/uoo-boot-manager
+	rm -r -- debian/uoo-boot-manager/DEBIAN
+
+override_dh_python3:
+	dh_python3 /usr/lib/uoo-boot-manager
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod 0755 debian/uoo-boot-manager/usr/lib/uoo-boot-manager/helper.py
+
+# Preserve source-matching documentation/assets; compress Debian's changelog.
+override_dh_compress:
+	dh_compress -Xassets/ -XREADME.md -Xdocs/
+
+override_dh_auto_clean:

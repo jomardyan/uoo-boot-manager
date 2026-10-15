@@ -1,0 +1,4 @@
+# This is the human-maintained HTML source, not generated or minified output.
+# Long inline SVG markup exceeds Lintian's 512-character heuristic; the source
+# HTML and its separate app.js/styles.css are all present in website/.
+uoo-boot-manager source: source-is-missing [website/index.html]

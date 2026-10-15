@@ -18,8 +18,22 @@ for source_file in LICENSE uoo/__init__.py uoo/__main__.py uoo/app.py uoo/core.p
 done
 
 mkdir -p -- "$project_root/build" "$project_root/dist"
-stage="$(mktemp -d "$project_root/build/package.XXXXXX")"
-trap 'rm -rf -- "$stage"' EXIT
+stage_only=false
+if [[ $# == 2 && "$1" == --stage-only ]]; then
+    stage="$(realpath -m -- "$2")"
+    if [[ -e "$stage" ]]; then
+        printf 'Staging directory must not already exist: %s\n' "$stage" >&2
+        exit 1
+    fi
+    mkdir -p -- "$stage"
+    stage_only=true
+elif [[ $# == 0 ]]; then
+    stage="$(mktemp -d "$project_root/build/package.XXXXXX")"
+    trap 'rm -rf -- "$stage"' EXIT
+else
+    printf 'Usage: %s [--stage-only DIRECTORY]\n' "$0" >&2
+    exit 2
+fi
 chmod 0755 "$stage"
 
 install -d -m 0755 \
@@ -73,6 +87,11 @@ done < <(find "$project_root/assets/icons" -type f -print0)
 if [[ -f "$project_root/docs/images/grub.png" ]]; then
     install -d -m 0755 "$stage/usr/share/doc/$package_name/docs" "$stage/usr/share/doc/$package_name/docs/images"
     install -m 0644 "$project_root/docs/images/grub.png" "$stage/usr/share/doc/$package_name/docs/images/"
+fi
+
+if $stage_only; then
+    printf 'Staged package files in %s\n' "$stage"
+    exit 0
 fi
 
 output="$project_root/dist/${package_name}_${package_version}_all.deb"

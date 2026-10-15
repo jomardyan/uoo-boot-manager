@@ -1,0 +1,19 @@
+.TH UOO-BOOT-INSPECT 1 "October 2026" "Uoo Boot Manager" "User Commands"
+.SH NAME
+uoo-boot-inspect \- inspect the installed Uoo helper and available boot data
+.SH SYNOPSIS
+.B uoo-boot-inspect
+.RB [ --probe ]
+.SH DESCRIPTION
+Print a JSON response with the installed version and helper availability.
+Without an option, also include the boot configuration visible to the user.
+This command does not apply changes or request administrator authentication.
+.SH OPTIONS
+.TP
+.B --probe
+Report version and installed-helper availability without reading boot settings.
+.SH EXIT STATUS
+Zero indicates a successful response. A nonzero status indicates an error;
+the JSON response includes its description.
+.SH AUTHOR
+Hayk Jomardyan.

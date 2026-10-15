@@ -1,0 +1,23 @@
+.TH UOO-BOOT-HELPER 1 "October 2026" "Uoo Boot Manager" "User Commands"
+.SH NAME
+uoo-boot-helper \- authenticated administrator helper for Uoo
+.SH SYNOPSIS
+.B uoo-boot-helper --stdin
+.SH DESCRIPTION
+Internal interface used by the installed Uoo desktop through polkit.
+It accepts one bounded JSON request on standard input and prints a JSON
+response. The helper validates its protected installation, the caller, the
+request, and the detected boot configuration before applying an operation.
+.PP
+Use the desktop application to review and authenticate changes.
+Do not replace the helper with a copy from a user-writable source tree.
+The helper does not accept arbitrary shell commands.
+.SH FILES
+.TP
+.I /usr/lib/uoo-boot-manager/helper.py
+Installed helper implementation.
+.TP
+.I /usr/share/polkit-1/actions/org.uoo.boot-manager.policy
+Authentication policy for the fixed helper command.
+.SH AUTHOR
+Hayk Jomardyan.

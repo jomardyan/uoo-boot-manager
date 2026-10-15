@@ -1,0 +1,32 @@
+.TH UOO-BOOT-MANAGER 1 "October 2026" "Uoo Boot Manager" "User Commands"
+.SH NAME
+uoo-boot-manager \- configure supported Ubuntu boot settings
+.SH SYNOPSIS
+.B uoo-boot-manager
+.RB [ --demo " | " --live ]
+.SH DESCRIPTION
+Uoo is a GTK4 desktop for GRUB, UEFI entries, backups, diagnostics, and
+supported Ubuntu bootloader repairs. It runs as the current user.
+Changes require authentication through the installed administrator helper.
+.SH OPTIONS
+.TP
+.B --demo
+Use sample configuration without changing system boot data.
+.TP
+.B --live
+Read this computer without automatically falling back to demo mode.
+.TP
+.BR -h ", " --help
+Show command-line help.
+.SH FILES
+.TP
+.I /etc/default/grub.d/zz-uoo.cfg
+Managed GRUB settings.
+.TP
+.I /etc/grub.d/41_uoo
+Managed custom entries.
+.TP
+.I /var/lib/uoo-boot-manager/backups
+Private recovery backups.
+.SH AUTHOR
+Hayk Jomardyan.

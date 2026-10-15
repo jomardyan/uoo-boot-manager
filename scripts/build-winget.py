@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 REPO = "jomardyan/uoo-boot-manager"
 PACKAGE_ID = "HaykJomardyan.UooBootManager"
-SCHEMA = "1.12.0"
+SCHEMA = "1.6.0"
 PRODUCT_CODE = "{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1"
 
 

@@ -33,8 +33,8 @@ writes three YAML files into:
 packaging/winget/manifests/h/HaykJomardyan/UooBootManager/2.2.0/
 ```
 
-The version, default-locale, and installer manifests use Microsoft's 1.12.0
-schemas. The generator rejects drafts, prereleases, missing/duplicate assets,
+The version, default-locale, and installer manifests use Microsoft's 1.6.0
+schemas for compatibility with existing WinGet clients. The generator rejects drafts, prereleases, missing/duplicate assets,
 unexpected download URLs, and hash mismatches. Re-running the same release is
 safe; it refuses to replace different manifests for an existing version.
 Review all three files before submission. Never replace published installer

@@ -5,6 +5,7 @@ source = Path(SPECPATH).parent
 a = Analysis(
     [str(source / "packaging/launch.py")],
     pathex=[str(source)],
+    datas=[(str(source / "uoo/icons"), "uoo/icons")],
     hiddenimports=["gi.repository.Gtk", "gi.repository.Gdk", "gi.repository.Adw"],
     hooksconfig={"gi": {"module-versions": {"Gtk": "4.0", "Gdk": "4.0", "Adw": "1"},
                         "icons": ["Adwaita"], "themes": ["Adwaita"]}},

@@ -1,0 +1,18 @@
+[Icon Theme]
+Name=Uoo
+Comment=Uoo application icons
+Directories=scalable/apps,symbolic/apps
+
+[scalable/apps]
+Size=128
+MinSize=16
+MaxSize=1024
+Type=Scalable
+Context=Applications
+
+[symbolic/apps]
+Size=16
+Type=Scalable
+MinSize=8
+MaxSize=256
+Context=Applications

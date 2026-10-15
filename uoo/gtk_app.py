@@ -24,6 +24,7 @@ from . import gtk_widgets as ui
 
 HELPER = Path("/usr/lib/uoo-boot-manager/helper.py")
 AUTH_HELPER = Path("/usr/bin/uoo-boot-helper")
+APP_ICON = "org.uoo.BootManager"
 STYLE_LABELS = ("Show menu", "Hidden", "Countdown")
 STYLE_VALUES = ("menu", "hidden", "countdown")
 BACKUP_TYPES = {
@@ -66,6 +67,7 @@ class BootWindow(Adw.ApplicationWindow):
 
     def __init__(self, application, demo=False, auto_demo=True):
         super().__init__(application=application, title="Uoo Boot Manager", default_width=1120, default_height=740)
+        self.set_icon_name(APP_ICON)
         self.set_size_request(900, 640)
         self.explicit_demo = demo
         self.auto_demo = auto_demo
@@ -112,9 +114,13 @@ class BootWindow(Adw.ApplicationWindow):
                           resize_start_child=False, shrink_start_child=False, vexpand=True)
         sidebar_shell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12,
                                 margin_top=18, margin_bottom=14)
-        label = ui.text("Boot manager", "title-4")
-        label.set_margin_start(18)
-        sidebar_shell.append(label)
+        brand = Gtk.Box(spacing=10, margin_start=18, margin_end=12)
+        logo = Gtk.Image.new_from_icon_name(APP_ICON)
+        logo.set_pixel_size(32)
+        logo.set_tooltip_text("Uoo Boot Manager")
+        brand.append(logo)
+        brand.append(ui.text("Boot manager", "title-4"))
+        sidebar_shell.append(brand)
         self.sidebar = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self.sidebar.add_css_class("navigation-sidebar")
         sidebar_shell.append(self.sidebar)
@@ -1166,6 +1172,11 @@ class BootWindow(Adw.ApplicationWindow):
 class UooApplication(Adw.Application):
     def __init__(self, demo=False, auto_demo=True):
         super().__init__(application_id="org.uoo.BootManager", flags=Gio.ApplicationFlags.NON_UNIQUE)
+        display = Gdk.Display.get_default()
+        fallback_icons = Path(__file__).resolve().parent / "icons"
+        if display is not None and fallback_icons.is_dir():
+            Gtk.IconTheme.get_for_display(display).add_search_path(str(fallback_icons))
+        Gtk.Window.set_default_icon_name(APP_ICON)
         self.demo = demo
         self.auto_demo = auto_demo
         self.window = None

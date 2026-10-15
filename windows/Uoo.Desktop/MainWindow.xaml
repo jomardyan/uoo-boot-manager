@@ -13,6 +13,7 @@
     <Grid Margin="24,16,24,14">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <Image Source="uoo.png" Width="36" Height="36" Margin="0,0,12,0" AutomationProperties.Name="Uoo Boot Manager icon" />
         <TextBlock Text="Uoo" FontSize="26" FontWeight="SemiBold" Margin="0,0,12,0" />
         <TextBlock Text="Boot Manager" Opacity="0.7" VerticalAlignment="Center" />
         <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Padding="8,3" Margin="14,0,0,0" VerticalAlignment="Center">

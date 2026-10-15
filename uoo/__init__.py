@@ -1,3 +1,3 @@
 """Uoo Boot Manager for Ubuntu."""
 
-__version__ = "2.1.2"
+__version__ = "2.2.0"

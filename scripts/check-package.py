@@ -21,13 +21,20 @@ def expected_files(source):
         "usr/lib/uoo-boot-manager/helper.py": (source / "helper.py", 0o755),
         "usr/lib/uoo-boot-manager/inspector.py": (source / "inspector.py", 0o644),
         "usr/share/applications/uoo-boot-manager.desktop": (source / "packaging/uoo-boot-manager.desktop", 0o644),
-        "usr/share/icons/hicolor/scalable/apps/uoo-boot-manager.svg": (source / "packaging/uoo-boot-manager.svg", 0o644),
+        "usr/share/icons/hicolor/scalable/apps/org.uoo.BootManager.svg": (source / "packaging/uoo-boot-manager.svg", 0o644),
+        "usr/share/icons/hicolor/symbolic/apps/org.uoo.BootManager-symbolic.svg": (source / "assets/icons/uoo-symbolic.svg", 0o644),
+        "usr/share/doc/uoo-boot-manager/copyright": (source / "LICENSE", 0o644),
         "usr/share/doc/uoo-boot-manager/README.md": (source / "README.md", 0o644),
         "usr/share/doc/uoo-boot-manager/docs/PRODUCTION.md": (source / "docs/PRODUCTION.md", 0o644),
         "usr/share/doc/uoo-boot-manager/docs/VALIDATION.md": (source / "docs/VALIDATION.md", 0o644),
         "usr/share/doc/uoo-boot-manager/docs/PACKAGING.md": (source / "docs/PACKAGING.md", 0o644),
         "usr/share/polkit-1/actions/org.uoo.boot-manager.policy": (source / "packaging/org.uoo.boot-manager.policy", 0o644),
     }
+    for size in (16, 24, 32, 48, 64, 128, 256, 512):
+        mapping[f"usr/share/icons/hicolor/{size}x{size}/apps/org.uoo.BootManager.png"] = (source / f"assets/icons/png/uoo-{size}.png", 0o644)
+    for asset in sorted((source / "assets/icons").rglob("*")):
+        if asset.is_file():
+            mapping["usr/share/doc/uoo-boot-manager/" + asset.relative_to(source).as_posix()] = (asset, 0o644)
     for module in sorted((source / "uoo").glob("*.py")):
         mapping["usr/lib/uoo-boot-manager/uoo/" + module.name] = (module, 0o644)
     if (source / "docs/images/grub.png").is_file():

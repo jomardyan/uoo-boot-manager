@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "2.1.2"
+  #define AppVersion "2.2.0"
 #endif
 #ifndef PayloadDir
   #error PayloadDir must point to a validated self-contained publish directory
@@ -15,11 +15,13 @@
 AppId={{1179B417-6013-4CFA-92E3-41C9F5FC07F5}
 AppName=Uoo Boot Manager
 AppVersion={#AppVersion}
-AppPublisher=Uoo
+AppPublisher=Hayk Jomardyan
+AppCopyright=Copyright (c) 2026 Hayk Jomardyan
 AppPublisherURL=https://github.com/jomardyan/uoo-boot-manager
 DefaultDirName={autopf}\Uoo Boot Manager
 DefaultGroupName=Uoo Boot Manager
 UninstallDisplayIcon={app}\Uoo.BootManager.exe
+SetupIconFile=..\Uoo.Desktop\uoo.ico
 OutputDir={#OutputDir}
 OutputBaseFilename=Uoo-Boot-Manager-{#AppVersion}-windows-{#CpuArch}-setup
 SetupArchitecture=x64

@@ -10,7 +10,7 @@ if ! command -v dpkg-deb >/dev/null 2>&1; then
     exit 1
 fi
 
-for source_file in uoo/__init__.py uoo/__main__.py uoo/app.py uoo/core.py uoo/system.py helper.py docs/PRODUCTION.md docs/VALIDATION.md docs/PACKAGING.md; do
+for source_file in LICENSE uoo/__init__.py uoo/__main__.py uoo/app.py uoo/core.py uoo/system.py helper.py docs/PRODUCTION.md docs/VALIDATION.md docs/PACKAGING.md; do
     if [[ ! -f "$project_root/$source_file" ]]; then
         printf 'Missing source file: %s\n' "$source_file" >&2
         exit 1
@@ -52,12 +52,24 @@ for module in "$project_root"/uoo/*.py; do
     install -m 0644 "$module" "$stage/usr/lib/$package_name/uoo/"
 done
 install -m 0644 "$project_root/packaging/uoo-boot-manager.desktop" "$stage/usr/share/applications/"
-install -m 0644 "$project_root/packaging/uoo-boot-manager.svg" "$stage/usr/share/icons/hicolor/scalable/apps/"
+install -m 0644 "$project_root/packaging/uoo-boot-manager.svg" "$stage/usr/share/icons/hicolor/scalable/apps/org.uoo.BootManager.svg"
+install -d -m 0755 "$stage/usr/share/icons/hicolor/symbolic" "$stage/usr/share/icons/hicolor/symbolic/apps"
+install -m 0644 "$project_root/assets/icons/uoo-symbolic.svg" "$stage/usr/share/icons/hicolor/symbolic/apps/org.uoo.BootManager-symbolic.svg"
+for size in 16 24 32 48 64 128 256 512; do
+    install -d -m 0755 "$stage/usr/share/icons/hicolor/${size}x${size}" "$stage/usr/share/icons/hicolor/${size}x${size}/apps"
+    install -m 0644 "$project_root/assets/icons/png/uoo-${size}.png" \
+        "$stage/usr/share/icons/hicolor/${size}x${size}/apps/org.uoo.BootManager.png"
+done
+install -m 0644 "$project_root/LICENSE" "$stage/usr/share/doc/$package_name/copyright"
 install -m 0644 "$project_root/README.md" "$stage/usr/share/doc/$package_name/README.md"
 install -d -m 0755 "$stage/usr/share/doc/$package_name/docs"
 for document in PRODUCTION.md VALIDATION.md PACKAGING.md; do
     install -m 0644 "$project_root/docs/$document" "$stage/usr/share/doc/$package_name/docs/"
 done
+while IFS= read -r -d '' asset; do
+    relative="${asset#"$project_root/"}"
+    install -D -m 0644 "$asset" "$stage/usr/share/doc/$package_name/$relative"
+done < <(find "$project_root/assets/icons" -type f -print0)
 if [[ -f "$project_root/docs/images/grub.png" ]]; then
     install -d -m 0755 "$stage/usr/share/doc/$package_name/docs" "$stage/usr/share/doc/$package_name/docs/images"
     install -m 0644 "$project_root/docs/images/grub.png" "$stage/usr/share/doc/$package_name/docs/images/"

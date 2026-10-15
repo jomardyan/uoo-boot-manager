@@ -1,5 +1,7 @@
 name: uoo-boot-manager
 version: '@VERSION@'
+license: MIT
+icon: snap/gui/uoo-boot-manager.png
 summary: Native desktop for supported boot settings
 description: |
   Manage boot configuration through the installed, authenticated native Uoo

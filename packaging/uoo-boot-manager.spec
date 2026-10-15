@@ -10,7 +10,7 @@ Release: 1.opensuse
 Release: 1
 %endif
 Summary: Native desktop manager for GRUB and UEFI boot settings
-License: LicenseRef-Not-Specified
+License: MIT
 BuildArch: noarch
 Source0: payload.tar.gz
 AutoReqProv: no
@@ -56,6 +56,6 @@ cp -a usr %{buildroot}/
 /usr/lib/uoo-boot-manager/inspector.py
 /usr/lib/uoo-boot-manager/uoo
 /usr/share/applications/uoo-boot-manager.desktop
-/usr/share/icons/hicolor/scalable/apps/uoo-boot-manager.svg
+/usr/share/icons/hicolor/*/apps/org.uoo.BootManager*
 /usr/share/polkit-1/actions/org.uoo.boot-manager.policy
 /usr/share/doc/uoo-boot-manager

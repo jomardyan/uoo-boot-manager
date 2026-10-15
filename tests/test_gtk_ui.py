@@ -83,6 +83,12 @@ class NativeDesktopTests(unittest.TestCase):
             self.assertTrue(page.scroll.get_vexpand())
         self.assert_no_errors()
 
+    def test_application_icon_resolves_from_the_source_fallback_theme(self):
+        self.assertEqual(self.window.get_icon_name(), "org.uoo.BootManager")
+        theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        self.assertTrue(theme.has_icon("org.uoo.BootManager"))
+        self.assertTrue(theme.has_icon("org.uoo.BootManager-symbolic"))
+
     def test_fixed_default_remember_and_one_time_grub(self):
         self.window.select_grub(3)
         self.window.timeout.set_value(6)

@@ -1,5 +1,7 @@
 # Uoo 2.1.2 validation record
 
+<img src="../assets/icons/png/uoo-64.png" width="64" height="64" alt="Uoo Boot Manager icon">
+
 Validation dates: 14–15 October 2026. This report separates current 2.1 package and native-desktop CI from the historical 2.0 Ubuntu boot/reboot evidence. Ubuntu system management requires Ubuntu 24.04+ with an existing GRUB installation; its repair support is limited to the verified x86-64 plain-disk layouts described in the operational manual. The Windows 11 edition uses native WPF and a separately authenticated installed administrator helper.
 
 ## 2.1.0 baseline CI evidence

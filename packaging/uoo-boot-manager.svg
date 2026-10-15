@@ -1,7 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="28" fill="#171c27"/>
-  <path d="M85 37a34 34 0 1 0 9 39" fill="none" stroke="#ed7b39" stroke-width="11" stroke-linecap="round"/>
-  <path d="M82 26h22v23" fill="none" stroke="#ed7b39" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="m103 27-30 30" fill="none" stroke="#ed7b39" stroke-width="11" stroke-linecap="round"/>
-  <path d="M47 70h28M47 82h19" fill="none" stroke="#f5f6f9" stroke-width="6" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Uoo Boot Manager</title>
+  <desc id="desc">An amber U rises into a boot arrow above two light menu lines, on a graphite tile.</desc>
+  <defs>
+    <linearGradient id="tile" x1="24" y1="4" x2="104" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#303c50"/>
+      <stop offset="0.52" stop-color="#1d2738"/>
+      <stop offset="1" stop-color="#141c2a"/>
+    </linearGradient>
+    <linearGradient id="signal" x1="42" y1="30" x2="87" y2="99" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc276"/>
+      <stop offset="0.48" stop-color="#ff994d"/>
+      <stop offset="1" stop-color="#ee692f"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="7" width="120" height="117" rx="28" fill="#0c111c"/>
+  <rect x="4" y="3" width="120" height="117" rx="28" fill="url(#tile)"/>
+  <rect x="4.75" y="3.75" width="118.5" height="115.5" rx="27.25" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="1.5"/>
+  <g id="mark" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M35 37v32c0 16 12 28 28 28s28-12 28-28V31m-12 12 12-12 12 12" stroke="#080e18" stroke-opacity="0.25" stroke-width="12" transform="translate(0 2)"/>
+    <path d="M35 37v32c0 16 12 28 28 28s28-12 28-28V31m-12 12 12-12 12 12" stroke="url(#signal)" stroke-width="11"/>
+    <path d="M52 51h17" stroke="#f8fafc" stroke-width="5"/>
+    <path d="M52 64h11" stroke="#aab8cd" stroke-width="5"/>
+  </g>
 </svg>

@@ -19,8 +19,8 @@ mv "$stage/squashfs-root" "$stage/desktop"
 mkdir -p "$stage/snap/gui"
 sed -e "s/@VERSION@/$package_version/g" -e "s/@SNAP_ARCH@/$snap_arch/g" \
     "$project_root/packaging/snapcraft.yaml.in" > "$stage/snap/snapcraft.yaml"
-install -m0644 "$project_root/packaging/uoo-boot-manager.svg" "$stage/snap/gui/uoo-boot-manager.svg"
-sed 's|^Icon=.*|Icon=${SNAP}/meta/gui/uoo-boot-manager.svg|' \
+install -m0644 "$project_root/assets/icons/png/uoo-512.png" "$stage/snap/gui/uoo-boot-manager.png"
+sed 's|^Icon=.*|Icon=${SNAP}/meta/gui/uoo-boot-manager.png|' \
     "$project_root/packaging/uoo-boot-manager.desktop" > "$stage/snap/gui/uoo-boot-manager.desktop"
 (cd "$stage" && snapcraft --destructive-mode)
 install -m0644 "$stage/uoo-boot-manager_${package_version}_${snap_arch}.snap" "$project_root/dist/"

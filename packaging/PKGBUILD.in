@@ -4,7 +4,7 @@ pkgrel=1
 pkgdesc='Native GTK4 boot configuration desktop with an authenticated helper'
 arch=('any')
 url='https://github.com/jomardyan/uoo-boot-manager'
-license=('LicenseRef-Not-Specified')
+license=('MIT')
 depends=('python>=3.10' 'python-gobject' 'gobject-introspection-runtime' 'gtk4>=4.6' 'libadwaita>=1.5' 'polkit')
 optdepends=('efibootmgr: UEFI inspection and configuration')
 source=('payload.tar.gz')

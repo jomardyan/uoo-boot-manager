@@ -1,9 +1,11 @@
 <Project>
   <PropertyGroup>
-    <Version>2.1.2</Version>
+    <Version>2.2.0</Version>
     <Company>Uoo</Company>
     <Product>Uoo Boot Manager</Product>
-    <Copyright>Uoo Boot Manager contributors</Copyright>
+    <Copyright>Copyright (c) 2026 Hayk Jomardyan</Copyright>
+    <Authors>Hayk Jomardyan</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>

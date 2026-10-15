@@ -16,6 +16,8 @@ jobs:
     if: "startsWith(github.event.head_commit.message, 'release: v')"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      version: ${{ steps.request.outputs.version }}
     permissions:
       contents: write
       actions: write
@@ -24,6 +26,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate version, create immutable tag, and dispatch release builds
+        id: request
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -39,6 +42,7 @@ jobs:
             exit 1
           fi
           tag="v$version"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
           if existing="$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq .object.sha 2>/dev/null)"; then
             if [[ "$existing" != "$GITHUB_SHA" ]]; then
               printf 'Refusing to move existing tag %s to another commit.\n' "$tag" >&2
@@ -50,3 +54,25 @@ jobs:
           # Token-created tag pushes do not trigger workflows; dispatch both explicitly.
           gh workflow run verify.yml --ref "$tag"
           gh workflow run windows.yml --ref "$tag"
+
+  publish:
+    name: Publish the verified release
+    needs: tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Wait for both release workflows, verify every package, and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          python3 scripts/publish-release.py --repo "$GH_REPO" \
+            --version "$RELEASE_VERSION" --commit "$GITHUB_SHA" \
+            --notes "docs/releases/$RELEASE_VERSION.md"

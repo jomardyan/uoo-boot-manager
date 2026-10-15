@@ -1,5 +1,13 @@
 # Linux package builds
 
+<img src="../assets/icons/png/uoo-64.png" width="64" height="64" alt="Uoo Boot Manager icon">
+
+Every Linux format uses the `org.uoo.BootManager` icon family. Native packages
+and Flatpak include the scalable, symbolic, and 16–512 px raster icons.
+AppImage and Snap carry the same icon inside the desktop bundle; Snap also
+uses the 512 px PNG for its package metadata. Sources and platform exports
+are documented in [the icon guide](../assets/icons/README.md).
+
 The **Build Linux packages** workflow in `.github/workflows/verify.yml` runs on
 pushes, pull requests, and manual dispatches. It builds these outputs:
 
@@ -59,9 +67,9 @@ For custom boot entries in Flatpak, enter filesystem-relative boot paths
 manually; other file choices use the desktop portal.
 
 ```sh
-flatpak install --user ./uoo-boot-manager-2.1.2-x86_64.flatpak
+flatpak install --user ./uoo-boot-manager-2.2.0-x86_64.flatpak
 flatpak run org.uoo.BootManager
-sudo snap install --dangerous --classic ./uoo-boot-manager_2.1.2_amd64.snap
+sudo snap install --dangerous --classic ./uoo-boot-manager_2.2.0_amd64.snap
 uoo-boot-manager
 ```
 
@@ -87,26 +95,37 @@ sha256sum --check SHA256SUMS
 
 ## Release a version
 
+For APT repositories, Snap Store publication, and Ubuntu App Center listings,
+follow the [Ubuntu publishing guide](PUBLISHING.md). The steps below create
+GitHub release assets.
+
 Set the same three-part version in `uoo/__init__.py`, `packaging/control`,
 and `windows/Directory.Build.props`,
 commit the release sources, then push the matching tag:
 
 ```sh
-git tag v2.1.2
-git push origin v2.1.2
+git tag v2.2.0
+git push origin v2.2.0
 ```
 
-Alternatively, push a commit on `main` whose first line is `release: v2.1.2`
+Alternatively, push a commit on `main` whose first line is `release: v2.2.0`
 after synchronizing those version files. **Create requested release tag**
 checks the requested version, creates the tag at that exact commit, and
 dispatches both package workflows on it. It refuses to move an existing tag
 to another commit. This uses the repository token without additional secrets.
 
+For release-request commits, the publishing job waits for successful Linux
+and Windows builds at the same immutable tag and commit. It requires the
+complete package set, downloads every asset, verifies both SHA256 manifests,
+and then publishes the release with the checked-in versioned release notes.
+Directly pushed tags still create drafts for manual publication.
+
 The workflow rejects a mismatched tag or metadata version. All tests and all
 package builds and architecture checks must pass before the workflow creates a **draft** GitHub
-release and attaches the packages and checksums. Review and publish the draft
-from GitHub Releases. For a combined release, wait for both the Linux and
-Windows package workflows to succeed before publishing. Only tag-creation and
+release and attaches the packages and checksums. For directly pushed tags,
+review and publish that draft from GitHub Releases after both platform
+workflows succeed. Release-request commits use the verified publishing job
+described above. Only tag-creation, publishing, and
 release jobs receive `contents: write`; the
 normal build jobs use read access. No additional repository secrets are needed.
 Rerunning a tag build can update its draft, but cannot overwrite a published
@@ -129,6 +148,105 @@ optional and are not part of the automatic draft-release gate; hardware
 validation requirements remain documented in `PRODUCTION.md`.
 
 ## Build locally on Ubuntu
+
+The root `Makefile` wraps the existing scripts. Run targets from the repository
+root, or use `make -C /path/to/uoo-boot-manager <target>`. Plain `make` shows
+help. GNU Make and Bash are required; each format still needs its native tools
+and runtime prerequisites described below.
+
+Make prints cyan task headings, green `[OK]` results, and red `[FAIL]` results
+with the failing command's exit status. Colors are enabled automatically in
+terminals and omitted from redirected output. Use `make COLOR=always help`
+to force colors, or `make COLOR=never check` to disable them. A nonempty
+`NO_COLOR` environment variable also disables colors, including forced colors.
+
+Install missing build dependencies with the matching endpoint:
+
+```sh
+make deps DEPS_ARGS=--dry-run         # Preview all host-supported dependencies
+make deps                           # Install them (aliases: deps-all, install-deps)
+make deps-windows                    # PowerShell 7 and .NET 10 SDK for ZIP builds
+make deps-test-gtk                   # GTK4/libadwaita and headless display tools
+make deps-appimage                   # Bundler venv and checksum-verified tools
+make deps-flatpak                    # Flatpak tools and manifest-matched GNOME SDK
+make deps-snap                       # AppImage prerequisites and classic Snapcraft
+make deps-vm-test                    # Debian tools, QEMU, firmware, ISO and SSH tools
+make deps-packages PACKAGE_FORMATS="deb rpm rpm-opensuse"
+make deps DEPS_FOR="windows test-gtk" # Combine operations in one transaction
+```
+
+Every build/check operation has a `deps-<target>` endpoint, including
+`deps-deb`, `deps-rpm`, `deps-rpm-opensuse`, `deps-arch`, `deps-check`,
+`deps-smoke`, and `deps-windows-test`. `deps-all` means all host-supported
+operations. The installer requires Python 3, Make, Bash, and sudo to start;
+run it as your normal user. It supports apt on Ubuntu/Debian and pacman on
+Arch/Manjaro, queries installed packages first, and installs only missing
+requested packages. Package-manager dependencies may also be installed.
+On Arch, keep the system and package databases up to date through the normal
+full system upgrade procedure before installing dependencies.
+
+`DEPS_ARGS=--dry-run` probes existing packages/tools and prints commands without
+installing, downloading, or writing files. Real runs serialize dependency
+installations with a user lock, use sudo for system packages and Snapcraft,
+and keep other tooling under your account. Network access is needed for
+missing packages, SDKs, and runtimes; Flatpak SDK downloads can be large.
+Flatpak setup adds the Flathub user remote and installs the runtime and SDK
+versions from the checked-in manifest. Snap setup installs classic Snapcraft
+through an operational snapd service.
+
+The combined endpoint skips native Arch packaging on apt hosts and Snapcraft
+on Arch hosts. Explicit requests for those unsupported combinations fail
+before installation. `deps-packages` follows `PACKAGE_FORMATS`, including its
+platform restrictions. Other Linux distributions retain the manual build
+instructions and CI environments described here. Dependency installation
+prepares build tools; it does not install Uoo or run boot-management actions.
+
+`deps-windows` uses [Microsoft's .NET installer](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-install-script)
+for missing .NET 10 SDKs and a SHA256-verified official PowerShell archive when
+PowerShell 7 is missing. Launchers are created in `~/.local/bin`; ensure that
+directory is on your shell's PATH. Existing working installations are reused.
+On Linux, `make windows` automatically builds the Windows ZIP and checksums;
+`WINDOWS_BUILD_ARGS=-SkipInstaller` is also accepted. Windows installer creation
+and native Windows tests require a Windows host. The dependency installer
+does not provide Windows or Inno Setup on Linux.
+
+```sh
+make build                          # Debian package in dist/
+make check                          # Python tests + Debian archive validation
+make test-gtk                       # Native interaction tests under Xvfb
+make smoke                          # Source demo startup under Xvfb
+make -j2 packages PACKAGE_FORMATS="deb rpm rpm-opensuse"
+make verify-checksums
+```
+
+`packages` builds the selected formats before writing `dist/SHA256SUMS`.
+Its default selection includes every Linux format and requires all their
+prerequisites; select formats for your host with `PACKAGE_FORMATS`. Debian
+payload construction is shared between RPM and Arch targets, including with
+parallel Make. `snap` first builds the matching native AppImage, then runs
+Snapcraft in destructive mode as described below. `checksums` generates a
+manifest from existing Linux packages without rebuilding them.
+
+After `make deps-appimage`, `make appimage` and `make snap` use the managed
+`build/appimage-venv` and `build/tools` paths automatically. The downloaded
+AppImage tool/runtime versions and SHA256 checksums match CI. Explicit
+`BUILD_PYTHON`, `APPIMAGETOOL`, and `APPIMAGETOOL_RUNTIME_FILE` overrides still
+take precedence. The manual environment setup below is also supported.
+`PYTHON=/path/to/python3` selects the interpreter
+for Make's checks; packaging scripts still use their existing `python3` and
+`BUILD_PYTHON` conventions. `make test` permits GTK tests to skip when a display
+or dependencies are absent; `make test-gtk` requires PyGObject, GTK4,
+libadwaita 1.5+, `dbus-run-session`, and `xvfb-run`.
+
+`make vm-test` builds and validates Debian, then runs the disposable Ubuntu
+guest exercise, including its bootloader operations and reboot. It downloads
+the guest image and requires the QEMU/firmware tools documented in
+`PRODUCTION.md`. Pass options with `VM_ARGS`, for example
+`make vm-test VM_ARGS="--boot-mode bios"` or
+`make vm-test VM_ARGS="--secure-boot"`.
+
+`make clean` removes `build/`, including any bundler virtual environment and
+downloaded tools stored there. `make distclean` also removes `dist/` packages.
 
 ```sh
 sudo apt install dpkg-dev rpm python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
@@ -157,7 +275,7 @@ Build an Arch package as an ordinary user on Arch with `dpkg`, `base-devel`,
 Python, and zstd installed:
 
 ```sh
-bash scripts/build-arch.sh dist/uoo-boot-manager_2.1.2_all.deb
+bash scripts/build-arch.sh dist/uoo-boot-manager_2.2.0_all.deb
 ```
 
 Flatpak builds require `flatpak-builder` plus the GNOME 50 platform and SDK in
@@ -167,7 +285,7 @@ and a matching-architecture AppImage:
 ```sh
 flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
 bash scripts/build-flatpak.sh
-bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.1.2-x86_64.AppImage
+bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.2.0-x86_64.AppImage
 ```
 
 Snapcraft's destructive mode installs its build prerequisites on the build
@@ -177,5 +295,5 @@ modify boot settings. To run an AppImage where FUSE is unavailable:
 
 ```sh
 chmod +x dist/*.AppImage
-APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.1.2-x86_64.AppImage --demo
+APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.2.0-x86_64.AppImage --demo
 ```

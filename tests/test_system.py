@@ -1,6 +1,5 @@
 """Exercise boot transactions against temporary files and a fake firmware tool."""
 
-import json
 import os
 from pathlib import Path
 import tempfile

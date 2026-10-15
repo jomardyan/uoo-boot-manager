@@ -1,3 +1,5 @@
+"""Package payload validation, the polkit action contract, and release version agreement."""
+
 import importlib.util
 import io
 from pathlib import Path
@@ -76,6 +78,19 @@ class PackageValidationTests(unittest.TestCase):
         self.assertEqual(defaults, {"allow_any": "auth_admin", "allow_inactive": "auth_admin", "allow_active": "auth_admin"})
         annotations = {item.attrib["key"]: item.text for item in action.findall("annotate")}
         self.assertEqual(annotations, {"org.freedesktop.policykit.exec.path": "/usr/bin/uoo-boot-helper"})
+
+    def test_hardcoded_versions_match_release(self):
+        version = package_check.subprocess.run(["python3", str(SOURCE / "scripts/package-version.py")],
+                                               check=True, capture_output=True, text=True).stdout.strip()
+        self.assertIn(f"<Version>{version}</Version>", (SOURCE / "windows/Directory.Build.props").read_text())
+        for manifest in ("windows/Uoo.Desktop/app.manifest", "windows/Uoo.Helper/app.manifest"):
+            identity = ET.parse(SOURCE / manifest).getroot().find("{urn:schemas-microsoft-com:asm.v1}assemblyIdentity")
+            self.assertEqual(identity.attrib["version"], f"{version}.0", manifest)
+        self.assertIn(f'#define AppVersion "{version}"', (SOURCE / "windows/packaging/uoo.iss").read_text())
+        release = ET.parse(SOURCE / "packaging/org.uoo.BootManager.metainfo.xml").getroot().find("releases/release")
+        self.assertEqual(release.attrib["version"], version)
+        changelog = (SOURCE / "debian/changelog").read_text().splitlines()[0]
+        self.assertTrue(changelog.startswith(f"uoo-boot-manager ({version}-"), changelog)
 
     def test_built_package_matches_source(self):
         packages = sorted((SOURCE / "dist").glob("uoo-boot-manager_*_all.deb"), key=lambda path: path.stat().st_mtime)

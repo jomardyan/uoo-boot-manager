@@ -17,7 +17,7 @@ for tool in rpmbuild dpkg-deb; do
 done
 if [[ $# -gt 1 ]]; then
     printf 'Usage: %s [--opensuse] [validated-debian-package]\n' "$0" >&2
-    exit 1
+    exit 2
 fi
 if [[ $# -eq 0 ]]; then
     bash "$project_root/scripts/build-deb.sh"

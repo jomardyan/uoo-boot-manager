@@ -49,9 +49,9 @@ internal static class SmokeRunner
             Assert(window.Snapshot.Demo, "All operations stayed in demo mode", checks);
             await File.WriteAllTextAsync(Path.Combine(directory, "smoke-report.json"), JsonSerializer.Serialize(new { success = true, toolkit = "WPF Fluent", environment = Environment.OSVersion.ToString(), architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), checks, screenshots = images }, new JsonSerializerOptions { WriteIndented = true }));
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            await File.WriteAllTextAsync(Path.Combine(directory, "smoke-report.json"), JsonSerializer.Serialize(new { success = false, error = ex.ToString(), checks, screenshots = images }, new JsonSerializerOptions { WriteIndented = true }));
+            await File.WriteAllTextAsync(Path.Combine(directory, "smoke-report.json"), JsonSerializer.Serialize(new { success = false, error = error.ToString(), checks, screenshots = images }, new JsonSerializerOptions { WriteIndented = true }));
             throw;
         }
     }
@@ -89,24 +89,24 @@ public partial class MainWindow
     {
         SkipConfirmationsForSmoke = true;
         void Check(bool value, string name) => SmokeRunner.Assert(value, name, checks);
-        Navigate("Windows boot"); _timeout.Text = "17"; _displayMenu.IsChecked = false;
+        Navigate("Windows boot"); timeout.Text = "17"; displayMenu.IsChecked = false;
         Check(HasDrafts, "Editing boot menu creates a retained draft");
-        Navigate("Diagnostics"); Navigate("Windows boot"); Check(_timeout.Text == "17", "Navigation preserves boot menu drafts");
+        Navigate("Diagnostics"); Navigate("Windows boot"); Check(timeout.Text == "17", "Navigation preserves boot menu drafts");
         Check(await ApplyMenuAsync(), "Apply Windows boot menu");
         Check(Snapshot.Menu.Timeout == 17 && !Snapshot.Menu.DisplayMenu, "Saved menu matches controls"); Check(!HasDrafts, "Successful apply clears drafts");
-        _menuOrder.SelectedIndex = 0; ExcludeMenuEntry();
-        Check(_menuOrder.Items.Count == 2 && !HasDrafts, "Running Windows stays in the menu");
-        _menuOrder.SelectedIndex = 1; ExcludeMenuEntry();
+        menuOrder.SelectedIndex = 0; ExcludeMenuEntry();
+        Check(menuOrder.Items.Count == 2 && !HasDrafts, "Running Windows stays in the menu");
+        menuOrder.SelectedIndex = 1; ExcludeMenuEntry();
         Check(HasDrafts && await ApplyMenuAsync(), "Apply exclusion of a Windows menu entry");
         Check(Snapshot.Entries.Count == 2 && Snapshot.Menu.Order.Count == 1, "Exclusion retains the Windows registration");
-        _menuEntryPicker.SelectedItem = _menuEntryPicker.Items.OfType<BootEntry>().Single(e => e.Id == DemoBootService.OtherWindowsId);
+        menuEntryPicker.SelectedItem = menuEntryPicker.Items.OfType<BootEntry>().Single(e => e.Id == DemoBootService.OtherWindowsId);
         IncludeMenuEntry(); IncludeMenuEntry();
-        Check(_menuOrder.Items.Count == 2 && await ApplyMenuAsync(), "Re-include a hidden entry without duplicates");
-        _menuOrder.SelectedIndex = 1; Move(_menuOrder, -1); Check(await ApplyMenuAsync(), "Apply reordered Windows entries");
+        Check(menuOrder.Items.Count == 2 && await ApplyMenuAsync(), "Re-include a hidden entry without duplicates");
+        menuOrder.SelectedIndex = 1; Move(menuOrder, -1); Check(await ApplyMenuAsync(), "Apply reordered Windows entries");
         Check(Snapshot.Menu.Order[0] == DemoBootService.OtherWindowsId, "Windows boot order persisted");
-        Navigate("Entry options"); _safeBoot.SelectedItem = "Network"; _bootLog.IsChecked = true; _sos.IsChecked = true; _baseVideo.IsChecked = true; _menuPolicy.SelectedItem = "Legacy";
+        Navigate("Entry options"); safeBoot.SelectedItem = "Network"; bootLog.IsChecked = true; sos.IsChecked = true; baseVideo.IsChecked = true; menuPolicy.SelectedItem = "Legacy";
         Check(await ApplyOptionsAsync(), "Apply advanced Windows startup options");
-        Check(Snapshot.Entries.Single(x => x.Id == _optionsEntryId).Options.SafeBoot == "Network", "Safe mode options persisted");
+        Check(Snapshot.Entries.Single(x => x.Id == optionsEntryId).Options.SafeBoot == "Network", "Safe mode options persisted");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.CopyEntry, TargetId = DemoBootService.OtherWindowsId, Description = "Smoke Windows copy" }, "Copy", "Copy demo entry"), "Copy Windows entry");
         var copied = Snapshot.Entries.Single(x => x.Description == "Smoke Windows copy");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.RenameEntry, TargetId = copied.Id, Description = "Smoke renamed entry" }, "Rename", "Rename demo entry"), "Rename Windows entry");
@@ -114,19 +114,19 @@ public partial class MainWindow
         Check(!await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteEntry, TargetId = copied.Id }, "Delete", "Delete scheduled entry"), "Scheduled Windows entry deletion is blocked");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.ClearBootOnce }, "Clear", "Clear next boot"), "Clear next Windows boot");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteEntry, TargetId = copied.Id }, "Delete", "Delete demo copy"), "Delete copied Windows entry");
-        Navigate("Firmware"); _firmwareOrder.SelectedIndex = 1; Move(_firmwareOrder, -1); Check(await ApplyFirmwareOrderAsync(), "Apply reordered UEFI entries");
+        Navigate("Firmware"); firmwareOrder.SelectedIndex = 1; Move(firmwareOrder, -1); Check(await ApplyFirmwareOrderAsync(), "Apply reordered UEFI entries");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.SetFirmwareBootOnce, TargetId = DemoBootService.FirmwareUbuntuId }, "Once", "Schedule demo EFI entry"), "Schedule next UEFI boot");
         Check(!await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteFirmwareEntry, TargetId = DemoBootService.FirmwareUbuntuId }, "Delete", "Delete scheduled entry"), "Scheduled firmware entry deletion is blocked");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.ClearFirmwareBootOnce }, "Clear", "Clear next firmware boot"), "Clear next UEFI boot");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.AddFirmwareEntry, Description = "Smoke EFI entry", EfiPartition = @"S:\", EfiLoaderPath = @"\EFI\uoo\smoke.efi" }, "Add", "Add sample loader"), "Register demo EFI loader");
         var added = Snapshot.Firmware.Entries.Single(x => x.Description == "Smoke EFI entry");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteFirmwareEntry, TargetId = added.Id }, "Delete", "Remove demo loader", added.Id), "Delete demo EFI registration");
-        Navigate("Windows boot"); _timeout.Text = "23";
+        Navigate("Windows boot"); timeout.Text = "23";
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.CreateBackup, Description = "Smoke backup" }, "Backup", "Create demo backup", preserveDrafts: true), "Create manual backup");
-        Check(_timeout.Text == "23" && HasDrafts, "Creating backup preserves unapplied menu changes");
+        Check(timeout.Text == "23" && HasDrafts, "Creating backup preserves unapplied menu changes");
         var manual = Snapshot.Backups.First(x => x.Description == "Smoke backup");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteBackup, BackupId = manual.Id }, "Delete backup", "Delete sample backup", preserveDrafts: true), "Delete manual backup");
-        Check(_timeout.Text == "23" && HasDrafts, "Deleting backup preserves unapplied menu changes");
+        Check(timeout.Text == "23" && HasDrafts, "Deleting backup preserves unapplied menu changes");
         Check(await ApplyMenuAsync(), "Draft applies after backup revision changes");
         var restore = Snapshot.Backups.First(x => x.CanRestore);
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.RestoreBackup, BackupId = restore.Id, Confirmation = "RESTORE" }, "Restore", "Restore sample backup", "RESTORE"), "Restore demo backup");

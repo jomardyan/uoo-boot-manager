@@ -45,19 +45,19 @@ public static class BootConfiguration
         };
     }
 
-    public static async Task<string> ReadFileAsync(string path, CancellationToken token = default)
+    public static async Task<string> ReadFileAsync(string path, CancellationToken cancellationToken = default)
     {
         await using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         // Bound the actual read, even if the file grows after it is opened.
         var bytes = new byte[MaximumBytes + 1];
-        var count = await file.ReadAtLeastAsync(bytes, bytes.Length, throwOnEndOfStream: false, cancellationToken: token);
+        var count = await file.ReadAtLeastAsync(bytes, bytes.Length, throwOnEndOfStream: false, cancellationToken: cancellationToken);
         if (count > MaximumBytes) throw new InvalidDataException("Configuration files must be no larger than 1 MiB.");
         int start = count >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf ? 3 : 0;
         try { return Utf8.GetString(bytes, start, count - start); }
         catch (DecoderFallbackException error) { throw new InvalidDataException("Configuration files must contain valid UTF-8 JSON.", error); }
     }
 
-    public static async Task WriteFileAsync(string path, string json, CancellationToken token = default)
+    public static async Task WriteFileAsync(string path, string json, CancellationToken cancellationToken = default)
     {
         var destination = Path.GetFullPath(path);
         var temporary = Path.Combine(Path.GetDirectoryName(destination)!, ".uoo-export-" + Guid.NewGuid().ToString("N"));
@@ -65,10 +65,10 @@ public static class BootConfiguration
         {
             await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.Asynchronous))
             {
-                await file.WriteAsync(Utf8.GetBytes(json), token);
+                await file.WriteAsync(Utf8.GetBytes(json), cancellationToken);
                 file.Flush(true);
             }
-            token.ThrowIfCancellationRequested();
+            cancellationToken.ThrowIfCancellationRequested();
             File.Move(temporary, destination, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }

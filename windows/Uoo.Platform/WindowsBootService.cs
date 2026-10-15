@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Management;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -128,7 +130,7 @@ public sealed class WindowsBootService : IBootService
                 throw new IOException("The change failed. Previous boot settings were restored: " + error.Message, error);
             }
         }
-        catch (Exception error) when (error is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException or ManagementException or System.Runtime.InteropServices.COMException or System.ComponentModel.Win32Exception or JsonException)
+        catch (Exception error) when (error is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException or ManagementException or COMException or Win32Exception or JsonException)
         { return new() { Success = false, Message = error.Message, Snapshot = Inspect() }; }
     }
 
@@ -179,7 +181,7 @@ public sealed class WindowsBootService : IBootService
                 WindowsVersion = Environment.OSVersion.VersionString, Entries = entries, Menu = menu, Firmware = firmware,
                 Backups = saved, Diagnostics = WindowsMachine.Diagnostics(), Repair = WindowsMachine.RepairPlan(), Errors = errors };
         }
-        catch (Exception error) when (error is ManagementException or InvalidOperationException or IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException or ArgumentException or OverflowException)
+        catch (Exception error) when (error is ManagementException or InvalidOperationException or IOException or UnauthorizedAccessException or COMException or ArgumentException or OverflowException)
         {
             return new() { RequiresAdministrator = !WindowsMachine.Administrator, Machine = Environment.MachineName,
                 WindowsVersion = Environment.OSVersion.VersionString, Errors = [error.Message], Diagnostics = WindowsMachine.Diagnostics(),
@@ -215,7 +217,7 @@ public sealed class WindowsBootService : IBootService
             var matches = entries.Where(e => devices.Contains(e.Device) && e.Path.Equals(current.LoaderPath, StringComparison.OrdinalIgnoreCase) && e.Description == current.Description).ToList();
             return matches.Count == 1 ? matches[0].Id : "";
         }
-        catch (Exception error) when (error is IOException or System.ComponentModel.Win32Exception or ManagementException or UnauthorizedAccessException or DecoderFallbackException)
+        catch (Exception error) when (error is IOException or Win32Exception or ManagementException or UnauthorizedAccessException or DecoderFallbackException)
         { return ""; }
     }
     private static string Revision(List<BcdRecord> records, string current)

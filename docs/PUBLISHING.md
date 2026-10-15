@@ -267,10 +267,13 @@ and the referenced key is available before using it.
 
 For an immediate local upgrade while the repository is queued, use a verified
 DEB built for the running Ubuntu release after removing the incomplete source.
-For the Resolute package prepared in this workspace:
+Build it from that suite's source bundle with `dpkg-source -x` and
+`dpkg-buildpackage -b -us -uc` as described above; the package is written to
+the parent directory of the extracted source. For example, on Resolute, run
+this from that parent directory:
 
 ```sh
-sudo apt install ./dist/ppa-resolute/binary/uoo-boot-manager_2.2.0-0ppa1~resolute1_all.deb
+sudo apt install ./uoo-boot-manager_2.2.0-0ppa1~resolute1_all.deb
 ```
 
 Subsequent PPA versions are delivered through normal APT updates. To seek

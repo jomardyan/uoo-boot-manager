@@ -120,7 +120,7 @@ def _basic_snapshot(paths=Paths(), runner=run_command):
     # Resolve saved defaults for display without evaluating any configuration.
     if settings.get("GRUB_DEFAULT") == "saved":
         try:
-            env = paths.config.parent / "grubenv"
+            env = paths.grubenv
             data = env.read_bytes().decode("utf-8", "replace")
             match = re.search(r"(?m)^saved_entry=(.*)$", data)
             if match:

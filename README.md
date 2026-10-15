@@ -271,7 +271,7 @@ python3 -m unittest discover -s tests -v
 Native GTK tests need desktop dependencies and an isolated display:
 
 ```sh
-GDK_BACKEND=x11 GSK_RENDERER=cairo xvfb-run -a python3 -m unittest discover -s tests -v
+GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 -m unittest discover -s tests -v
 ```
 
 The Linux workflow builds and checks Debian, RPM, Arch, AppImage, Flatpak, and

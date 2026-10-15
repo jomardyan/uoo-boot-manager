@@ -84,7 +84,7 @@ def validate_grub_changes(settings):
         raise ValueError("GRUB changes must be a settings object.")
     unknown = set(settings) - GRUB_KEYS
     if unknown:
-        raise ValueError("Unsupported GRUB setting: " + ", ".join(sorted(map(str, unknown))))
+        raise ValueError("Unsupported GRUB setting: " + ", ".join(sorted(map(str, unknown))) + ".")
     validated = {}
     for key, value in settings.items():
         if key in GRUB_BOOLEAN_KEYS:

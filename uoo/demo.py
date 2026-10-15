@@ -53,7 +53,7 @@ class DemoManager:
                 "system": {"distribution": "Ubuntu 24.04 LTS (demo)", "kernel": "6.8.0-generic",
                            "architecture": "x86_64", "boot_mode": "UEFI", "secure_boot": "disabled (demo)"},
                 "checks": [{"name": "GRUB configuration", "status": "ok", "detail": "Demo boot menu is valid."},
-                           {"name": "EFI system partition", "status": "ok", "detail": "/dev/sda1 is mounted at /boot/efi."},
+                           {"name": "EFI System Partition", "status": "ok", "detail": "/dev/sda1 is mounted at /boot/efi."},
                            {"name": "UEFI firmware", "status": "ok", "detail": "Three simulated boot entries are available."},
                            {"name": "Demo mode", "status": "info", "detail": "Changes stay in memory for this session."}],
                 "devices": copy.deepcopy(devices), "environment_supported": True,
@@ -249,7 +249,7 @@ class DemoManager:
     def _repair_plan():
         return {"id": "demo-repair", "mode": "uefi", "target": "/boot/efi", "confirmation": "/boot/efi",
                 "summary": ["Back up the current supported configuration.",
-                            "Reinstall the Ubuntu EFI boot loader on /dev/sda1.",
+                            "Reinstall the Ubuntu EFI bootloader on /dev/sda1.",
                             "Rebuild and validate the GRUB menu. No restart is performed."],
                 "supported": True, "reason": ""}
 
@@ -377,7 +377,7 @@ class DemoManager:
         elif action == "apply_background":
             encoded = request.get("png")
             if type(encoded) is not str or len(encoded) > 3 * 1024 * 1024:
-                raise ValueError("Background must be a base64 PNG up to 2 MiB.")
+                raise ValueError("Background must be a base64 PNG no larger than 2 MiB.")
             try:
                 image = base64.b64decode(encoded, validate=True)
             except (ValueError, binascii.Error) as exc:
@@ -479,7 +479,7 @@ class DemoManager:
                 raise ValueError("Inspect the demo repair plan and confirm /boot/efi exactly.")
             self._backup("all", "Configuration before simulated EFI repair",
                          {**self._grub_state(), "firmware": self._firmware_state()})
-            message = "Demo boot-loader repair completed. No restart was performed."
+            message = "Demo bootloader repair completed. No restart was performed."
         self._sync()
         return copy.deepcopy({"ok": True, "snapshot": self._state, "backups": self._metadata(),
                               "message": message, **extra})

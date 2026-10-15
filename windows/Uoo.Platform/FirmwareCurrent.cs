@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -46,7 +47,7 @@ internal static class FirmwareCurrent
         using var privilege = new TokenPrivilege("SeSystemEnvironmentPrivilege");
         var current = ReadVariable("BootCurrent");
         if (current.Length != 2) throw new IOException("Firmware BootCurrent has an invalid size.");
-        var number = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(current);
+        var number = BinaryPrimitives.ReadUInt16LittleEndian(current);
         return Parse(ReadVariable("Boot" + number.ToString("X4")));
     }
     private static byte[] ReadVariable(string name)
@@ -59,7 +60,7 @@ internal static class FirmwareCurrent
     internal static FirmwareBootIdentity Parse(byte[] data)
     {
         if (data.Length is < 12 or > 64 * 1024) throw new IOException("Invalid EFI load option size.");
-        var pathLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(4));
+        var pathLength = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(4));
         int position = 6;
         while (position + 1 < data.Length && (data[position] != 0 || data[position + 1] != 0)) position += 2;
         if (position + 1 >= data.Length) throw new IOException("EFI load option description is unterminated.");
@@ -71,7 +72,7 @@ internal static class FirmwareCurrent
         while (position < end)
         {
             if (position + 4 > end) throw new IOException("Truncated EFI device node.");
-            var length = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(position + 2));
+            var length = BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(position + 2));
             if (length < 4 || position + length > end) throw new IOException("Invalid EFI device node length.");
             var type = data[position]; var subtype = data[position + 1];
             if (type == 4 && subtype == 1)

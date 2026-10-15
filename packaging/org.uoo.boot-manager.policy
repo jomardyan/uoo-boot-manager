@@ -2,7 +2,7 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD polkit Policy Configuration 1.0//EN" "http://www.freedesktop.org/software/polkit/policyconfig-1.dtd">
 <policyconfig>
   <vendor>Uoo Boot Manager</vendor>
-  <icon_name>uoo-boot-manager</icon_name>
+  <icon_name>org.uoo.BootManager</icon_name>
   <action id="org.uoo.boot-manager.modify">
     <description>Manage Ubuntu boot settings with Uoo Boot Manager</description>
     <message>Administrator authentication is required to change boot settings or manage Uoo backups.</message>

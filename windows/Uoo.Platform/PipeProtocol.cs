@@ -6,24 +6,24 @@ namespace Uoo.Platform;
 public static class PipeProtocol
 {
     public const int MaximumBytes = 4 * 1024 * 1024;
-    public static async Task<string> ReadAsync(Stream stream, CancellationToken token)
+    public static async Task<string> ReadAsync(Stream stream, CancellationToken cancellationToken)
     {
         var header = new byte[4];
-        await stream.ReadExactlyAsync(header, token);
+        await stream.ReadExactlyAsync(header, cancellationToken);
         int length = BinaryPrimitives.ReadInt32LittleEndian(header);
-        if (length is < 2 or > MaximumBytes) throw new InvalidDataException("Invalid administrator response size.");
+        if (length is < 2 or > MaximumBytes) throw new InvalidDataException("Invalid administrator message size.");
         byte[] body = new byte[length];
-        await stream.ReadExactlyAsync(body, token);
+        await stream.ReadExactlyAsync(body, cancellationToken);
         return new UTF8Encoding(false, true).GetString(body);
     }
-    public static async Task WriteAsync(Stream stream, string json, CancellationToken token)
+    public static async Task WriteAsync(Stream stream, string json, CancellationToken cancellationToken)
     {
         byte[] body = Encoding.UTF8.GetBytes(json);
-        if (body.Length is < 2 or > MaximumBytes) throw new InvalidDataException("The administrator request is too large.");
+        if (body.Length is < 2 or > MaximumBytes) throw new InvalidDataException("Invalid administrator message size.");
         var header = new byte[4];
         BinaryPrimitives.WriteInt32LittleEndian(header, body.Length);
-        await stream.WriteAsync(header, token);
-        await stream.WriteAsync(body, token);
-        await stream.FlushAsync(token);
+        await stream.WriteAsync(header, cancellationToken);
+        await stream.WriteAsync(body, cancellationToken);
+        await stream.FlushAsync(cancellationToken);
     }
 }

@@ -68,13 +68,13 @@ public sealed class ElevatedBootService : IBootService
             }
             return response;
         }
-        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        catch (Win32Exception error) when (error.NativeErrorCode == 1223)
         {
             return new() { Success = false, Message = "Administrator authentication was canceled. Your draft has been kept." };
         }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or JsonException or Win32Exception or OperationCanceledException)
+        catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or JsonException or Win32Exception or OperationCanceledException)
         {
-            return new() { Success = false, Message = ex is OperationCanceledException ? "The administrator operation timed out. Reload to inspect the final state before trying again." : ex.Message };
+            return new() { Success = false, Message = error is OperationCanceledException ? "The administrator operation timed out. Reload to inspect the final state before trying again." : error.Message };
         }
         finally { gate.Release(); }
     }

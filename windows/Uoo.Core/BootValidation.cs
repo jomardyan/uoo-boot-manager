@@ -129,7 +129,7 @@ public static partial class BootValidation
             if (request.FilePath is null || request.FilePath.Length > 1024 || request.FilePath.Any(char.IsControl))
                 throw new ArgumentException("Choose a configuration JSON file.");
             if (request.ConfigurationJson is null || System.Text.Encoding.UTF8.GetByteCount(request.ConfigurationJson) > BootConfiguration.MaximumBytes)
-                throw new ArgumentException("Configuration files must be smaller than 1 MiB.");
+                throw new ArgumentException("Configuration files must be no larger than 1 MiB.");
             if (request.Operation == BootOperation.ImportConfiguration && string.IsNullOrWhiteSpace(request.FilePath) && string.IsNullOrWhiteSpace(request.ConfigurationJson))
                 throw new ArgumentException("Choose a Windows configuration JSON file.");
         }

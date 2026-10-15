@@ -38,7 +38,8 @@ make icons
 The exporter needs Pillow, PyGObject/GdkPixbuf, and librsvg's SVG loader. Normal
 builds consume checked-in exports and do not require these extra tools.
 Generated copies in `packaging/`, `uoo/icons/`, and `windows/Uoo.Desktop/` must
-be committed together with the masters.
+be committed together with the masters. The copies in `website/assets/icons/`
+are refreshed by `make website`.
 
 For a website that serves this directory at `/assets/icons/`, use:
 
@@ -51,5 +52,7 @@ For a website that serves this directory at `/assets/icons/`, use:
 <meta name="theme-color" content="#1d2738">
 ```
 
-The repository does not currently contain a website. GitHub controls its own
-tab favicon; repository README markup cannot replace that favicon.
+The landing page in `website/` copies these icons into `website/assets/icons/`
+when built with `make website`; see the [website guide](../../website/README.md).
+GitHub controls its own tab favicon; repository README markup cannot replace
+that favicon.

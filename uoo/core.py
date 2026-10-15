@@ -1,7 +1,7 @@
 """Read GRUB data without evaluating shell code."""
 
-from dataclasses import dataclass
 from collections import Counter
+from dataclasses import dataclass
 import re
 import shlex
 
@@ -75,7 +75,7 @@ def _grub_events(text, quote=None, declarations=False):
 
 
 def structural_braces(line, quote=None):
-    """Return unquoted braces, ignoring comments, escapes, and ${variables}."""
+    """Return (unquoted brace events, open quote), ignoring comments, escapes, and ${variables}."""
     return _grub_events(line, quote)
 
 

@@ -93,3 +93,7 @@ class InspectorTests(unittest.TestCase):
                 self.assertEqual(status, 1)
                 self.assertFalse(response["ok"])
                 snapshot.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()

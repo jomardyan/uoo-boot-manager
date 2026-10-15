@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   tag:
+    name: Create the requested release tag
     if: "startsWith(github.event.head_commit.message, 'release: v')"
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -22,7 +23,7 @@ jobs:
       contents: write
       actions: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Validate version, create immutable tag, and dispatch release builds
@@ -64,7 +65,7 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Wait for both release workflows, verify every package, and publish

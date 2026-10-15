@@ -1,8 +1,9 @@
+using System.Buffers.Binary;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Runtime.InteropServices;
-using System.ComponentModel;
 using Uoo.Core;
 using Uoo.Platform;
 
@@ -141,7 +142,7 @@ internal static class LiveTransactions
             state = await Send(new() { Operation = BootOperation.Inspect });
             Check(ReadSystemBcd() == baseline && store.PendingId().Length == 0, "Recover an interrupted real BCD write from the protected journal");
         }
-        catch (Exception ex) { errors.Add(ex.ToString()); Console.Error.WriteLine(ex); }
+        catch (Exception error) { errors.Add(error.ToString()); Console.Error.WriteLine(error); }
         finally
         {
             if (baselineId.Length != 0)
@@ -155,7 +156,7 @@ internal static class LiveTransactions
                     Check(ReadSystemBcd() == baseline, "Final cleanup preserves original boot state");
                     if (firmwareVariables is not null) Check(ReadFirmwareVariables() == firmwareVariables, "Final cleanup preserves native UEFI variables");
                 }
-                catch (Exception ex) { errors.Add("Cleanup: " + ex); Console.Error.WriteLine("Cleanup: " + ex); }
+                catch (Exception error) { errors.Add("Cleanup: " + error); Console.Error.WriteLine("Cleanup: " + error); }
             }
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(reportPath))!);
             string finalListing;
@@ -213,13 +214,13 @@ internal static class LiveTransactions
         var order = Read("BootOrder", true)!;
         if (order.Length % 2 != 0 || order.Length > 4096) throw new IOException("Invalid native UEFI BootOrder size.");
         HashSet<ushort> ids = [];
-        for (int i = 0; i < order.Length; i += 2) ids.Add(System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(order.AsSpan(i)));
+        for (int i = 0; i < order.Length; i += 2) ids.Add(BinaryPrimitives.ReadUInt16LittleEndian(order.AsSpan(i)));
         foreach (var name in new[] { "BootCurrent", "BootNext" })
         {
             var selection = Read(name);
             if (selection is null) continue;
             if (selection.Length != 2) throw new IOException("Invalid native UEFI selection size.");
-            ids.Add(System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(selection));
+            ids.Add(BinaryPrimitives.ReadUInt16LittleEndian(selection));
         }
         foreach (var id in ids.Order()) _ = Read("Boot" + id.ToString("X4"), true);
         return JsonSerializer.Serialize(values);

@@ -255,7 +255,7 @@ try
         var elements = new Dictionary<uint, object?>(current.Elements) { [Bcd.Device] = new BcdDevice(2, @"\Device\HarddiskVolume999999", "") };
         bool refused = false;
         try { WindowsMachine.ValidateWindowsLoader(current with { Elements = elements }); }
-        catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException) { refused = true; }
+        catch (Exception error) when (error is ArgumentException or IOException or InvalidOperationException) { refused = true; }
         Check(refused);
     });
     Test("Windows loader target preflight rejects missing files and traversal", () =>
@@ -266,7 +266,7 @@ try
             var elements = new Dictionary<uint, object?>(current.Elements) { [change.Item1] = change.Item2 };
             bool refused = false;
             try { WindowsMachine.ValidateWindowsLoader(current with { Elements = elements }); }
-            catch (Exception ex) when (ex is ArgumentException or IOException or InvalidOperationException) { refused = true; }
+            catch (Exception error) when (error is ArgumentException or IOException or InvalidOperationException) { refused = true; }
             Check(refused);
         }
     });

@@ -18,7 +18,6 @@
       "install -m644 uoo/*.py /app/lib/uoo-boot-manager/uoo/",
       "install -m644 packaging/launch.py /app/lib/uoo-boot-manager/launch.py",
       "install -Dm644 packaging/uoo-boot-manager.desktop /app/share/applications/org.uoo.BootManager.desktop",
-      "sed -i 's/^Icon=.*/Icon=org.uoo.BootManager/' /app/share/applications/org.uoo.BootManager.desktop",
       "install -Dm644 packaging/uoo-boot-manager.svg /app/share/icons/hicolor/scalable/apps/org.uoo.BootManager.svg",
       "install -Dm644 assets/icons/uoo-symbolic.svg /app/share/icons/hicolor/symbolic/apps/org.uoo.BootManager-symbolic.svg",
       "for size in 16 24 32 48 64 128 256 512; do install -Dm644 assets/icons/png/uoo-${size}.png /app/share/icons/hicolor/${size}x${size}/apps/org.uoo.BootManager.png; done",

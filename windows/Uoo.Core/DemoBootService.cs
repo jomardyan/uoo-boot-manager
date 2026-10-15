@@ -122,9 +122,9 @@ public sealed class DemoBootService : IBootService
             state = state with { Revision = $"demo-{++revision}" };
             return Response(message);
         }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or IOException or InvalidDataException or UnauthorizedAccessException or JsonException)
         {
-            return new() { Success = false, Message = ex.Message, Snapshot = BootJson.Clone(state) };
+            return new() { Success = false, Message = error.Message, Snapshot = BootJson.Clone(state) };
         }
         finally { gate.Release(); }
     }

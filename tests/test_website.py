@@ -1,7 +1,6 @@
 """Static deployment checks and browser-independent download control behavior."""
 
 import importlib.util
-import json
 from pathlib import Path
 import shutil
 import subprocess

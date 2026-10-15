@@ -72,3 +72,7 @@ class ArchArchiveTests(unittest.TestCase):
         for fields in ({"missing_dependency": True}, {"script": True}, {"uid": 1000}):
             with self.subTest(fields=fields), self.assertRaises(ValueError):
                 self.validate(**fields)
+
+
+if __name__ == "__main__":
+    unittest.main()

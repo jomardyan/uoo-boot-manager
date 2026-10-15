@@ -92,8 +92,8 @@ help:
 	  "$${uoo_cyan}  make clean$${uoo_reset}        Delete build/ staging (including cached build tools)" \
 	  "$${uoo_cyan}  make distclean$${uoo_reset}    Delete build/ and dist/ outputs" \
 	  '' \
-	  "$${uoo_yellow}Overrides:$${uoo_reset} PYTHON, DOTNET, POWERSHELL, WINDOWS_RUNTIME, WINDOWS_BUILD_ARGS," \
-	  '           PACKAGE_FORMATS, VM_ARGS; AppImage reads BUILD_PYTHON,' \
+	  "$${uoo_yellow}Overrides:$${uoo_reset} PYTHON, DOTNET, POWERSHELL, NODE, WINDOWS_RUNTIME, WINDOWS_BUILD_ARGS," \
+	  '           WINGET_VERSION, PACKAGE_FORMATS, VM_ARGS; AppImage reads BUILD_PYTHON,' \
 	  '           APPIMAGETOOL and APPIMAGETOOL_RUNTIME_FILE from the environment.' \
 	  '           DEPS_FOR="windows test-gtk" selects operations; DEPS_ARGS=--dry-run previews.' \
 	  "$${uoo_yellow}Colors:$${uoo_reset}    COLOR=auto (default), always, or never; NO_COLOR disables colors." \

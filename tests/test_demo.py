@@ -1,7 +1,6 @@
 """Behavioral tests for complete, side-effect-free demo workflows."""
 
 import base64
-import copy
 import json
 from pathlib import Path
 import struct

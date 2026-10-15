@@ -1,8 +1,8 @@
-# Uoo 2.1.2 validation record
+# Uoo Boot Manager validation record
 
 <img src="../assets/icons/png/uoo-64.png" width="64" height="64" alt="Uoo Boot Manager icon">
 
-Validation dates: 14–15 October 2026. This report separates current 2.1 package and native-desktop CI from the historical 2.0 Ubuntu boot/reboot evidence. Ubuntu system management requires Ubuntu 24.04+ with an existing GRUB installation; its repair support is limited to the verified x86-64 plain-disk layouts described in the operational manual. The Windows 11 edition uses native WPF and a separately authenticated installed administrator helper.
+Validation dates: 14–15 October 2026. This report separates current package and native-desktop CI from the historical 2.0 Ubuntu boot/reboot evidence. Ubuntu system management requires Ubuntu 24.04+ with an existing GRUB installation; its repair support is limited to the verified x86-64 plain-disk layouts described in the operational manual. The Windows 11 edition uses native WPF and a separately authenticated installed administrator helper.
 
 ## 2.1.0 baseline CI evidence
 
@@ -55,20 +55,20 @@ All three guests matched every one of the 20 frozen runtime files after testing.
 
 Local detailed evidence is retained in `/tmp/uoo-vm-live/`, `/tmp/uoo-vm-secure/`, and `/tmp/uoo-vm-bios/`: `integration-before.log`, `integration-after.log`, `serial.log`, and `vm.json`. These temporary files are session evidence; the runner can reproduce them on another machine.
 
-## Reproduce on current 2.1 sources
+## Reproduce on current sources
 
 These commands build and test the current version. A new VM execution records evidence for that current runtime; it does not reproduce the historical source fingerprint merely by using the same integration script.
 
 ```sh
 bash scripts/build-deb.sh
-python3 scripts/check-package.py dist/uoo-boot-manager_2.1.2_all.deb
+python3 scripts/check-package.py dist/uoo-boot-manager_2.2.0_all.deb
 GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a \
   python3 -m unittest discover -s tests -v
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.2.0_all.deb \
   --work-dir /tmp/uoo-check-uefi --exercise
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.2.0_all.deb \
   --work-dir /tmp/uoo-check-secure --secure-boot --exercise
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.2.0_all.deb \
   --work-dir /tmp/uoo-check-bios --boot-mode bios --exercise
 ```
 
@@ -78,6 +78,6 @@ Run the VM commands on a machine with QEMU, `qemu-img`, OVMF, and `xorriso`. KVM
 
 The historical boot/reboot evidence covers disposable Ubuntu guests and simulated failure paths. Current CI package, desktop, and offline-store checks have the scope recorded above. Neither establishes compatibility with every physical firmware implementation, storage controller, filesystem, or power-loss scenario. Ubuntu repair refuses unsupported architectures, unverified targets, RAID/LVM/encrypted boot mappings, and layouts exceeding its rollback bounds. Signed UEFI repair uses the installed Ubuntu binaries and preserves firmware order and Secure Boot settings. Firmware deletion requires reconstructable local loader data.
 
-External Btrfs GRUB environment behavior, failure injection, corrupt backup metadata, and cancelled authentication were exercised with simulations. Real system-generated administrator password prompts and screen-reader operation were not manually audited. The installed polkit policy, fixed helper path, privileged ownership checks, and real helper operations were verified in the guests.
+External Btrfs GRUB environment behavior, failure injection, corrupt backup metadata, and canceled authentication were exercised with simulations. Real system-generated administrator password prompts and screen-reader operation were not manually audited. The installed polkit policy, fixed helper path, privileged ownership checks, and real helper operations were verified in the guests.
 
 The historical local delivery contained the Ubuntu `.deb`; its earlier portable build limitations do not describe the successful 2.1 multiformat CI run. Current Linux CI includes Fedora/openSUSE/Arch installation checks, clean-container AppImage startup, and Flatpak/Snap builds and host-bridge checks. Ubuntu remains the verified Linux boot-management backend. AppImage, Flatpak, and Snap require the matching installed native package helper for real changes; packaging for another distro or CPU does not establish bootloader repair support there.

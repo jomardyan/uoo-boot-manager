@@ -79,7 +79,7 @@ class RepairTests(unittest.TestCase):
         self.paths.efi.rmdir()
         self.paths.bios_modules.mkdir(parents=True)
         for index, entry in enumerate(self.fixture.inventory[1:], 1):
-            entry["parttype"] = "21686148-6449-6e6f-744e656564454649" if gpt and index == 1 else "0x83"
+            entry["parttype"] = "21686148-6449-6e6f-744e-656564454649" if gpt and index == 1 else "0x83"
             entry["size"] = 1024 * 1024 if index == 1 else 128 * 1024 * 1024
             directory = self.paths.sys_block / f"sda{index}"
             directory.mkdir(parents=True)

@@ -1,7 +1,7 @@
 """Verified firmware changes with protected current boot and recoverable state."""
 
-from pathlib import Path
 import copy
+from pathlib import Path
 import re
 
 from . import platform as facts

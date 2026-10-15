@@ -1,12 +1,13 @@
 <Project>
   <PropertyGroup>
     <Version>2.2.0</Version>
-    <Company>Uoo</Company>
+    <Company>Hayk Jomardyan</Company>
     <Product>Uoo Boot Manager</Product>
     <Copyright>Copyright (c) 2026 Hayk Jomardyan</Copyright>
     <Authors>Hayk Jomardyan</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
     <Deterministic>true</Deterministic>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>

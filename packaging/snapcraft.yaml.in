@@ -1,6 +1,8 @@
 name: uoo-boot-manager
 version: '@VERSION@'
 license: MIT
+website: https://github.com/jomardyan/uoo-boot-manager
+source-code: https://github.com/jomardyan/uoo-boot-manager
 icon: snap/gui/uoo-boot-manager.png
 summary: Native desktop for supported boot settings
 description: |

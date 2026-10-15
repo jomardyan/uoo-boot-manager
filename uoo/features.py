@@ -3,8 +3,8 @@
 import base64
 import json
 from pathlib import Path
-import shlex
 import re
+import shlex
 
 from .core import parse_entries, parse_settings
 from .models import compile_custom_entries, render_grub_settings, validate_custom_entries, validate_grub_changes, validate_png
@@ -180,7 +180,6 @@ class Features:
         current_environment = environment(self.paths, self.runner, strict=True)
         before = {key: current_environment.get(key) for key in ("saved_entry", "next_entry", "prev_saved_entry")}
         def verify():
-            from .production import environment
             if entry:
                 self.runner([self.paths.grub_reboot, "--boot-directory=" + str(self.paths.config.parent.parent), entry])
             else:
@@ -194,7 +193,7 @@ class Features:
     def apply_background(self, request):
         text = request.get("png")
         if not isinstance(text, str) or len(text) > 3 * 1024 * 1024:
-            raise ValueError("Choose a PNG image smaller than 2 MiB.")
+            raise ValueError("Choose a PNG image no larger than 2 MiB.")
         try:
             contents = base64.b64decode(text, validate=True)
         except ValueError as exc:

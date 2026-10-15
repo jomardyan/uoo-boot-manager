@@ -83,7 +83,7 @@ are not presented as verified UEFI repair targets.
 
 ## Build
 
-On Windows with the .NET 10 SDK and Inno Setup 7:
+On Windows with the .NET 10 SDK, PowerShell 7, and Inno Setup 7:
 
 ```powershell
 dotnet run --project windows/Uoo.Tests -c Release

@@ -53,33 +53,33 @@ internal sealed class ConfirmDialog : Window
 
 internal sealed class NameDialog : Window
 {
-    internal string Value => _entry.Text.Trim();
-    private readonly TextBox _entry = new() { MaxLength = 120 };
+    internal string Value => entry.Text.Trim();
+    private readonly TextBox entry = new() { MaxLength = 120 };
     internal NameDialog(Window owner, string title, string initial)
     {
         Owner = owner; Title = title; ThemeMode = owner.ThemeMode; Width = 490; SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(Ui.Text(title, 22, true)); panel.Children.Add(Ui.Text("Name", margin: new Thickness(0, 18, 0, 8)));
-        _entry.Text = initial; AutomationProperties.SetName(_entry, "Name"); panel.Children.Add(_entry);
+        entry.Text = initial; AutomationProperties.SetName(entry, "Name"); panel.Children.Add(entry);
         var error = Ui.Text("", margin: new Thickness(0, 8, 0, 0)); panel.Children.Add(error);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
         actions.Children.Add(new Button { Content = "Cancel", IsCancel = true, MinWidth = 90, Margin = new Thickness(0, 0, 8, 0) });
         var save = new Button { Content = "Continue", IsDefault = true, MinWidth = 100 }; save.SetResourceReference(StyleProperty, "AccentButtonStyle");
         save.Click += (_, _) => { try { BootValidation.Description(Value); DialogResult = true; } catch (ArgumentException ex) { error.Text = ex.Message; } };
         actions.Children.Add(save); panel.Children.Add(actions); Content = panel;
-        Loaded += (_, _) => { _entry.Focus(); _entry.SelectAll(); };
+        Loaded += (_, _) => { entry.Focus(); entry.SelectAll(); };
     }
 }
 
 internal sealed class EfiDialog : Window
 {
-    private readonly TextBox _name = new() { MaxLength = 120 };
-    private readonly TextBox _partition = new();
-    private readonly TextBox _loader = new();
-    internal string EntryName => _name.Text.Trim();
-    internal string Partition => _partition.Text.Trim();
-    internal string Loader => _loader.Text.Trim();
+    private readonly TextBox name = new() { MaxLength = 120 };
+    private readonly TextBox partition = new();
+    private readonly TextBox loader = new();
+    internal string EntryName => name.Text.Trim();
+    internal string Partition => partition.Text.Trim();
+    internal string Loader => loader.Text.Trim();
     internal EfiDialog(Window owner, BootSnapshot snapshot)
     {
         Owner = owner; Title = "Add an EFI boot entry"; ThemeMode = owner.ThemeMode; Width = 570;
@@ -87,16 +87,16 @@ internal sealed class EfiDialog : Window
         var panel = new StackPanel { Margin = new Thickness(24) };
         panel.Children.Add(Ui.Text(Title, 22, true));
         panel.Children.Add(Ui.Text("Register an existing loader on a mounted EFI system partition. The loader is checked again before it is registered.", margin: new Thickness(0, 12, 0, 8)));
-        _partition.Text = snapshot.Repair.SystemPartition;
-        _loader.Text = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64
+        partition.Text = snapshot.Repair.SystemPartition;
+        loader.Text = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture == System.Runtime.InteropServices.Architecture.Arm64
             ? @"\EFI\ubuntu\shimaa64.efi" : @"\EFI\ubuntu\shimx64.efi";
-        Ui.Field(panel, "Entry name", _name); Ui.Field(panel, @"EFI partition (for example S:\)", _partition); Ui.Field(panel, @"Loader path (\EFI\… .efi)", _loader);
+        Ui.Field(panel, "Entry name", name); Ui.Field(panel, @"EFI partition (for example S:\)", partition); Ui.Field(panel, @"Loader path (\EFI\… .efi)", loader);
         var browse = Ui.Button("Browse for an EFI loader…", () =>
         {
             var dialog = new OpenFileDialog { Filter = "EFI loaders (*.efi)|*.efi", Title = "Choose an existing EFI loader" };
             if (dialog.ShowDialog(this) != true) return;
             var root = System.IO.Path.GetPathRoot(dialog.FileName) ?? "";
-            _partition.Text = root; _loader.Text = "\\" + dialog.FileName[root.Length..].Replace('/', '\\');
+            partition.Text = root; loader.Text = "\\" + dialog.FileName[root.Length..].Replace('/', '\\');
         }); panel.Children.Add(browse);
         var error = Ui.Text("", margin: new Thickness(0, 8, 0, 0)); panel.Children.Add(error);
         var buttons = Ui.Actions(); buttons.Children.Add(new Button { Content = "Cancel", IsCancel = true, MinWidth = 90, Margin = new Thickness(0, 0, 8, 0) });

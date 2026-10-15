@@ -11,6 +11,7 @@ Release: 1
 %endif
 Summary: Native desktop manager for GRUB and UEFI boot settings
 License: MIT
+URL: https://github.com/jomardyan/uoo-boot-manager
 BuildArch: noarch
 Source0: payload.tar.gz
 AutoReqProv: no
@@ -28,6 +29,7 @@ Requires: gtk4 >= 4.6
 Requires: libadwaita >= 1.5
 %endif
 Requires: polkit
+Recommends: efibootmgr
 
 %description
 Manage boot menus, firmware entries, backups, and boot configuration with a

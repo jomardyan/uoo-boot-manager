@@ -361,7 +361,7 @@ class PngModelTests(unittest.TestCase):
     def chunk(kind, payload):
         return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
 
-    def png(self, raw=b"\0\x00\x00\x00\xff", width=1, height=1, depth=8, color=6, interlace=0):
+    def png(self, raw=b"\x00\x00\x00\x00\xff", width=1, height=1, depth=8, color=6, interlace=0):
         return (b"\x89PNG\r\n\x1a\n" + self.chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, depth, color, 0, 0, interlace))
                 + self.chunk(b"IDAT", zlib.compress(raw)) + self.chunk(b"IEND", b""))
 

@@ -1,4 +1,5 @@
 name: Build Linux packages
+
 on:
   push:
     branches: ['**']
@@ -113,10 +114,10 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git dpkg-dev python3-gi python3-gi-cairo \
             gir1.2-gtk-4.0 gir1.2-adw-1 xvfb xauth dbus-x11 fonts-dejavu-core
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist/ubuntu-compatibility
@@ -256,10 +257,10 @@ jobs:
     env:
       SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist
@@ -275,7 +276,7 @@ jobs:
               GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 /smoke-desktop.py -- /usr/bin/uoo-boot-manager
               rpm -V uoo-boot-manager
             '
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-opensuse
           path: dist/*.opensuse.noarch.rpm
@@ -291,10 +292,10 @@ jobs:
     env:
       SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist
@@ -313,7 +314,7 @@ jobs:
               GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /usr/bin/uoo-boot-manager
               pacman -Qkk uoo-boot-manager
             '
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-arch
           path: dist/*.pkg.tar.zst
@@ -327,10 +328,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist
@@ -354,10 +355,10 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: aarch64
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist
@@ -376,7 +377,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y ./dist/uoo-boot-manager_*_all.deb
           dbus-run-session -- flatpak run --command=flatpak-spawn org.uoo.BootManager --host /usr/bin/uoo-boot-inspect --probe | tee build/host-probe.json
           python3 -c 'import json; p=json.load(open("build/host-probe.json")); assert p["ok"] and p["installed"]'
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-flatpak-${{ matrix.arch }}
           path: dist/*.flatpak
@@ -398,14 +399,14 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: aarch64
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-appimage-${{ matrix.arch }}
           path: dist
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: linux-deb
           path: dist
@@ -421,7 +422,7 @@ jobs:
           GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /snap/bin/uoo-boot-manager
           printf '%s\n' '/usr/bin/uoo-boot-inspect --probe' | snap run --shell uoo-boot-manager | tee build/snap-host-probe.json
           grep '"installed": true' build/snap-host-probe.json
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-snap-${{ matrix.arch }}
           path: dist/*.snap
@@ -461,6 +462,8 @@ jobs:
             /tmp/uoo-vm-ci/qemu.log
             /tmp/uoo-vm-ci/vm.json
             /tmp/uoo-vm-ci/integration-*.log
+          if-no-files-found: warn
+          retention-days: 30
 
   collect:
     name: Collect packages and SHA256 checksums
@@ -468,7 +471,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Download all packages

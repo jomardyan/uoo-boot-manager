@@ -24,7 +24,7 @@ def main():
         if os.geteuid() != 0:
             raise RuntimeError("Administrator authentication is required.")
         if actual != installed / "helper.py":
-            raise RuntimeError("Install the Ubuntu package before applying real boot changes.")
+            raise RuntimeError("Install the native Uoo package before applying real boot changes.")
         # Prevent privileged execution of user-editable Python files, even if a
         # damaged installation leaves the launcher itself in the expected place.
         for path in (installed, actual, installed / "uoo", *sorted((installed / "uoo").glob("*.py"))):
@@ -53,4 +53,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

@@ -10,7 +10,7 @@ if ! command -v dpkg-deb >/dev/null 2>&1; then
     exit 1
 fi
 
-for source_file in LICENSE uoo/__init__.py uoo/__main__.py uoo/app.py uoo/core.py uoo/system.py helper.py docs/PRODUCTION.md docs/VALIDATION.md docs/PACKAGING.md; do
+for source_file in LICENSE uoo/__init__.py uoo/__main__.py uoo/app.py uoo/core.py uoo/system.py helper.py inspector.py docs/PRODUCTION.md docs/VALIDATION.md docs/PACKAGING.md; do
     if [[ ! -f "$project_root/$source_file" ]]; then
         printf 'Missing source file: %s\n' "$source_file" >&2
         exit 1

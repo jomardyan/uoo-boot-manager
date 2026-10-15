@@ -112,8 +112,15 @@ follow the [Ubuntu publishing guide](PUBLISHING.md). The steps below create
 GitHub release assets.
 
 Set the same three-part version in `uoo/__init__.py`, `packaging/control`,
-and `windows/Directory.Build.props`,
-commit the release sources, then push the matching tag:
+`windows/Directory.Build.props`, `windows/packaging/uoo.iss`, the
+`debian/changelog` entry, and a new `<release>` entry in
+`packaging/org.uoo.BootManager.metainfo.xml`. Use the four-part form (for
+example `2.2.0.0`) in `windows/Uoo.Desktop/app.manifest` and
+`windows/Uoo.Helper/app.manifest`. Also update the version shown by the
+website (`website/index.html` and `website/app.js`) and the README badge.
+`tests/test_packaging.py` checks that the Windows props, manifests, Inno Setup
+script, metainfo release, and changelog match the package version. Commit the
+release sources, then push the matching tag:
 
 ```sh
 git tag v2.2.0
@@ -131,6 +138,10 @@ and Windows builds at the same immutable tag and commit. It requires the
 complete package set, downloads every asset, verifies both SHA256 manifests,
 and then publishes the release with the checked-in versioned release notes.
 Directly pushed tags still create drafts for manual publication.
+To publish a release whose tag already exists, push a commit on `main` whose
+first line is `publish: v2.2.0`, or run **Publish an existing verified
+release** (`publish-release.yml`) manually with that version; it verifies the
+packages from the existing tag and publishes them with its release notes.
 
 The workflow rejects a mismatched tag or metadata version. All tests and all
 package builds and architecture checks must pass before the workflow creates a **draft** GitHub
@@ -253,7 +264,7 @@ libadwaita 1.5+, `dbus-run-session`, and `xvfb-run`.
 `make vm-test` builds and validates Debian, then runs the disposable Ubuntu
 guest exercise, including its bootloader operations and reboot. It downloads
 the guest image and requires the QEMU/firmware tools documented in
-`PRODUCTION.md`. Pass options with `VM_ARGS`, for example
+[VALIDATION.md](VALIDATION.md#reproduce-on-current-sources). Pass options with `VM_ARGS`, for example
 `make vm-test VM_ARGS="--boot-mode bios"` or
 `make vm-test VM_ARGS="--secure-boot"`.
 
@@ -279,7 +290,7 @@ in the workflow. Then run:
 build/appimage-venv/bin/python -m pip install -r packaging/appimage-requirements.txt
 BUILD_PYTHON="$PWD/build/appimage-venv/bin/python" \
   APPIMAGETOOL="$PWD/build/tools/appimagetool.AppImage" \
-  APPIMAGETOOL_RUNTIME_FILE="$PWD/build/tools/runtime-x86_64" \
+  APPIMAGETOOL_RUNTIME_FILE="$PWD/build/tools/runtime" \
   bash scripts/build-appimage.sh
 ```
 

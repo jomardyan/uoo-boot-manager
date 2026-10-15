@@ -1,8 +1,8 @@
-# Uoo 2.0 production requirements
+# Uoo Boot Manager production requirements
 
 <img src="../assets/icons/png/uoo-64.png" width="64" height="64" alt="Uoo Boot Manager icon">
 
-This release manages Ubuntu GRUB and UEFI boot configuration. Release readiness requires evidence for every item below; a successful package build alone does not establish readiness.
+These requirements cover the Ubuntu edition, which manages Ubuntu GRUB and UEFI boot configuration. Release readiness requires evidence for every item below; a successful package build alone does not establish readiness.
 
 ## Features
 

@@ -31,7 +31,7 @@ def atomic_write(path, data, mode=0o644):
         os.replace(name, path)
         sync_directory(path.parent)
     finally:
-        if os.path.exists(name):
+        if Path(name).exists():
             os.unlink(name)
 
 
@@ -106,10 +106,10 @@ def unseal(raw):
     try:
         envelope = json.loads(raw)
         if set(envelope) != {"record", "sha256"}:
-            raise ValueError("invalid envelope")
+            raise ValueError("Invalid envelope.")
         canonical = json.dumps(envelope["record"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
         if hashlib.sha256(canonical).hexdigest() != envelope["sha256"]:
-            raise ValueError("checksum mismatch")
+            raise ValueError("Checksum mismatch.")
         return envelope["record"]
     except (ValueError, TypeError, KeyError) as exc:
         raise RuntimeError("The saved state is corrupt or has been changed.") from exc

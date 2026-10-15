@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Management;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
@@ -38,7 +40,7 @@ internal sealed class ProtectedStore
     private readonly string root;
     public ProtectedStore() => root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Uoo", "BootManager");
     private string Folder(string id) => Path.Combine(root, Id(id));
-    private static string Id(string id) => Regex.IsMatch(id, @"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}$") ? id : throw new ArgumentException("Invalid backup identifier.");
+    private static string Id(string id) => Regex.IsMatch(id, @"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}\z") ? id : throw new ArgumentException("Invalid backup identifier.");
     public bool Exists => Directory.Exists(root);
     public void Ensure()
     {
@@ -115,7 +117,7 @@ internal sealed class ProtectedStore
             var records = bcd.Enumerate();
             List<EspPartition> partitions;
             try { partitions = WindowsMachine.Partitions(); }
-            catch (Exception error) when (error is System.Management.ManagementException or IOException or UnauthorizedAccessException) { partitions = []; }
+            catch (Exception error) when (error is ManagementException or IOException or UnauthorizedAccessException) { partitions = []; }
             var firmwareIds = snapshot.Firmware.Entries.Select(e => e.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var images = records.Where(e => firmwareIds.Contains(e.Id)).Select(e => new FirmwareImage(e.Id, e.Type,
                 e.Text(Bcd.Description), e.Text(Bcd.Path), e.Device,
@@ -139,7 +141,7 @@ internal sealed class ProtectedStore
         if (!Exists) return [];
         Validate(root, true);
         List<BackupInfo> result = [];
-        foreach (var directory in Directory.EnumerateDirectories(root).Where(p => Regex.IsMatch(Path.GetFileName(p), @"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}$")))
+        foreach (var directory in Directory.EnumerateDirectories(root).Where(p => Regex.IsMatch(Path.GetFileName(p), @"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{32}\z")))
         {
             var id = Path.GetFileName(directory);
             try { var value = Read(id); result.Add(new() { Id = id, Description = value.Description, CreatedAt = value.CreatedAt, CanRestore = true, Detail = value.Efi is null ? "BCD and firmware state" : "BCD, firmware, and system EFI files" }); }
@@ -161,7 +163,7 @@ internal sealed class ProtectedStore
         var bcdFile = BcdPath(id); Validate(bcdFile, false);
         if (new FileInfo(bcdFile).Length is < 4096 or > 64 * 1024 * 1024 || Hash(bcdFile) != value.BcdSha256) throw new IOException("BCD backup integrity check failed.");
         _ = Bcd.Id(value.CurrentId);
-        if (value.BootSession.Length != 0 && !Regex.IsMatch(value.BootSession, @"^[0-9A-F]{64}$")) throw new IOException("Invalid backup boot-session identity.");
+        if (value.BootSession.Length != 0 && !Regex.IsMatch(value.BootSession, @"^[0-9A-F]{64}\z")) throw new IOException("Invalid backup boot-session identity.");
         if (value.CreatedFirmwareId.Length != 0) _ = Bcd.Id(value.CreatedFirmwareId);
         if (value.CreatedFirmwareId.Length != 0 && (value.CreatedFirmware is null || value.CreatedFirmware.Id != value.CreatedFirmwareId ||
             value.CreatedFirmware.Description is null || value.CreatedFirmware.Path is null || value.CreatedFirmware.PartitionVolume is null ||
@@ -202,7 +204,7 @@ internal sealed class ProtectedStore
                 foreach (var item in Directory.EnumerateFileSystemEntries(directory, "*", SearchOption.AllDirectories)) WindowsMachine.SafePath(item);
                 Directory.Delete(directory, true);
             }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception) { }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or Win32Exception) { }
         }
         return (path, Cleanup);
     }

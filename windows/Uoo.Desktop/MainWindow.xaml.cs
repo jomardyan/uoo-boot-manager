@@ -9,34 +9,34 @@ using Uoo.Core;
 
 namespace Uoo.Desktop;
 
-public partial class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
     internal static readonly string[] PageNames = ["Overview", "Windows boot", "Entry options", "Firmware", "Backups", "Diagnostics", "Repair"];
     private static readonly string[] PageIcons = ["\uE80F", "\uE7F4", "\uE713", "\uE950", "\uE8F1", "\uE9D9", "\uE90F"];
-    private readonly IBootService _service;
-    private readonly bool _demo;
-    private BootSnapshot? _snapshot;
-    private readonly Dictionary<string, FrameworkElement> _pages = [];
-    private bool _busy, _rendering;
-    private Task? _loadTask;
-    private string _currentPage = "Overview";
-    private string _optionsEntryId = "";
-    private string _menuBaseline = "", _optionsBaseline = "", _firmwareBaseline = "";
-    private ComboBox _defaultEntry = new(), _menuEntryPicker = new(), _entryPicker = new(), _safeBoot = new(), _menuPolicy = new(), _firmwarePicker = new();
-    private TextBox _timeout = new();
-    private CheckBox _displayMenu = new(), _bootLog = new(), _sos = new(), _baseVideo = new(), _recovery = new();
-    private ListBox _menuOrder = new(), _firmwareOrder = new(), _backups = new();
-    private TextBlock _backupDetail = new();
-    private Button _restoreBackup = new(), _deleteBackup = new();
+    private readonly IBootService service;
+    private readonly bool demo;
+    private BootSnapshot? snapshot;
+    private readonly Dictionary<string, FrameworkElement> pages = [];
+    private bool busy, rendering;
+    private Task? loadTask;
+    private string currentPage = "Overview";
+    private string optionsEntryId = "";
+    private string menuBaseline = "", optionsBaseline = "", firmwareBaseline = "";
+    private ComboBox defaultEntry = new(), menuEntryPicker = new(), entryPicker = new(), safeBoot = new(), menuPolicy = new(), firmwarePicker = new();
+    private TextBox timeout = new();
+    private CheckBox displayMenu = new(), bootLog = new(), sos = new(), baseVideo = new(), recovery = new();
+    private ListBox menuOrder = new(), firmwareOrder = new(), backups = new();
+    private TextBlock backupDetail = new();
+    private Button restoreBackup = new(), deleteBackup = new();
     internal bool SkipConfirmationsForSmoke { get; set; }
-    internal BootSnapshot Snapshot => _snapshot ?? throw new InvalidOperationException("Settings have not loaded.");
-    public bool IsDemo => _demo;
+    internal BootSnapshot Snapshot => snapshot ?? throw new InvalidOperationException("Settings have not loaded.");
+    public bool IsDemo => demo;
     internal bool AllowClose { get; set; }
     public event EventHandler? ModeRequested;
 
     public MainWindow(IBootService service, bool demo = false)
     {
-        _service = service; _demo = demo;
+        this.service = service; this.demo = demo;
         InitializeComponent();
         ModeBadge.Text = demo ? "DEMO" : "LIVE";
         ModeButton.Content = demo ? "Open live mode" : "Open demo";
@@ -53,19 +53,19 @@ public partial class MainWindow : Window
         Closing += OnClosing;
         PreviewKeyDown += async (_, e) =>
         {
-            if (_busy || _snapshot is null) return;
+            if (busy || snapshot is null) return;
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.R) { e.Handled = true; await RefreshAsync(); }
             else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.S)
             {
                 e.Handled = true;
-                if (_currentPage == "Windows boot") await ApplyMenuAsync();
-                else if (_currentPage == "Entry options") await ApplyOptionsAsync();
-                else if (_currentPage == "Firmware") await ApplyFirmwareOrderAsync();
+                if (currentPage == "Windows boot") await ApplyMenuAsync();
+                else if (currentPage == "Entry options") await ApplyOptionsAsync();
+                else if (currentPage == "Firmware") await ApplyFirmwareOrderAsync();
             }
         };
     }
 
-    internal Task LoadAsync() => _loadTask ??= ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect }, false, false);
+    internal Task LoadAsync() => loadTask ??= ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect }, false, false);
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
     private async void Admin_Click(object sender, RoutedEventArgs e)
@@ -73,18 +73,18 @@ public partial class MainWindow : Window
         if (!ConfirmDiscard()) return;
         await ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect, Confirmation = "ADMIN" }, false, false);
     }
-    private void Mode_Click(object sender, RoutedEventArgs e) { if (!_busy) ModeRequested?.Invoke(this, EventArgs.Empty); }
+    private void Mode_Click(object sender, RoutedEventArgs e) { if (!busy) ModeRequested?.Invoke(this, EventArgs.Empty); }
     internal async Task RefreshAsync()
     {
-        if (_busy || !ConfirmDiscard()) return;
+        if (busy || !ConfirmDiscard()) return;
         await ExecuteAsync(new BootRequest { Operation = BootOperation.Inspect }, false, false);
     }
 
     private void Navigation_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (Navigation.SelectedItem is not ListBoxItem item) return;
-        _currentPage = (string)item.Tag;
-        if (_pages.TryGetValue(_currentPage, out var page)) PageHost.Content = page;
+        currentPage = (string)item.Tag;
+        if (pages.TryGetValue(currentPage, out var page)) PageHost.Content = page;
     }
     internal void Navigate(string page)
     {
@@ -93,11 +93,11 @@ public partial class MainWindow : Window
         Navigation.SelectedIndex = index;
     }
 
-    internal bool HasDrafts => _snapshot is not null &&
-        (MenuFingerprint() != _menuBaseline || OptionsFingerprint() != _optionsBaseline || FirmwareFingerprint() != _firmwareBaseline);
+    internal bool HasDrafts => snapshot is not null &&
+        (MenuFingerprint() != menuBaseline || OptionsFingerprint() != optionsBaseline || FirmwareFingerprint() != firmwareBaseline);
     public bool ConfirmDiscard()
     {
-        if (_busy) return false;
+        if (busy) return false;
         return !HasDrafts || Confirm("Discard unsaved changes?", "Your unapplied boot menu, entry options, or firmware order changes will be discarded.", null, false, out _);
     }
     private void OnClosing(object? sender, CancelEventArgs e)
@@ -114,31 +114,31 @@ public partial class MainWindow : Window
 
     internal async Task<bool> RunMutationAsync(BootRequest request, string title, string summary, string? required = null, bool preserveDrafts = false)
     {
-        if (_busy || _snapshot is null) return false;
-        request = request with { ExpectedRevision = _snapshot.Revision };
-        try { BootValidation.Validate(request, _snapshot); }
-        catch (ArgumentException ex) { ShowError(ex.Message); return false; }
+        if (busy || snapshot is null) return false;
+        request = request with { ExpectedRevision = snapshot.Revision };
+        try { BootValidation.Validate(request, snapshot); }
+        catch (ArgumentException error) { ShowError(error.Message); return false; }
         if (HasDrafts && !preserveDrafts) summary += "\n\nAny unapplied changes on other pages will be reloaded after this operation.";
         var protectedChange = request.Operation is not (BootOperation.CreateBackup or BootOperation.DeleteBackup or BootOperation.ExportConfiguration);
-        if (!Confirm(title, summary, required, protectedChange && BootValidation.RequiresRecoveryKey(_snapshot), out var acknowledged)) return false;
+        if (!Confirm(title, summary, required, protectedChange && BootValidation.RequiresRecoveryKey(snapshot), out var acknowledged)) return false;
         request = request with { RecoveryKeyAcknowledged = acknowledged };
         return await ExecuteAsync(request, true, preserveDrafts);
     }
 
     private async Task<bool> ExecuteAsync(BootRequest request, bool mutation, bool preserveDrafts)
     {
-        if (_busy) return false;
-        SetBusy(true, request.Operation == BootOperation.Inspect ? "Reading boot configuration…" : _demo ? "Applying demo changes…" : "Waiting for administrator approval and applying changes…");
+        if (busy) return false;
+        SetBusy(true, request.Operation == BootOperation.Inspect ? "Reading boot configuration…" : demo ? "Applying demo changes…" : "Waiting for administrator approval and applying changes…");
         try
         {
-            var response = await Task.Run(() => _service.ExecuteAsync(request));
+            var response = await Task.Run(() => service.ExecuteAsync(request));
             if (!response.Success || response.Snapshot is null)
             {
                 ShowError(string.IsNullOrWhiteSpace(response.Message) ? "The operation did not complete. Your unapplied changes are still available." : response.Message);
                 return false;
             }
-            _snapshot = response.Snapshot;
-            if (preserveDrafts && _pages.Count > 0) RefreshMetadata(); else RenderSnapshot();
+            snapshot = response.Snapshot;
+            if (preserveDrafts && pages.Count > 0) RefreshMetadata(); else RenderSnapshot();
             StatusText.Text = string.IsNullOrWhiteSpace(response.Message) ? "Boot configuration loaded." : response.Message;
             return true;
         }
@@ -152,7 +152,7 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy, string? message = null)
     {
-        _busy = busy; PageHost.IsEnabled = !busy; Navigation.IsEnabled = !busy;
+        this.busy = busy; PageHost.IsEnabled = !busy; Navigation.IsEnabled = !busy;
         RefreshButton.IsEnabled = !busy; AdminButton.IsEnabled = !busy; ModeButton.IsEnabled = !busy;
         BusyProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
         if (message is not null) StatusText.Text = message;
@@ -165,44 +165,44 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot()
     {
-        _rendering = true;
+        rendering = true;
         try
         {
             var snapshot = Snapshot;
-            if (!snapshot.Entries.Any(x => x.Id == _optionsEntryId && x.IsWindows)) _optionsEntryId = snapshot.Entries.FirstOrDefault(x => x.IsCurrent && x.IsWindows)?.Id ?? snapshot.Entries.FirstOrDefault(x => x.IsWindows)?.Id ?? "";
-            _pages.Clear();
-            _pages["Overview"] = BuildOverview(); _pages["Windows boot"] = BuildMenu();
-            _pages["Entry options"] = BuildOptions(); _pages["Firmware"] = BuildFirmware();
-            _pages["Backups"] = BuildBackups(); _pages["Diagnostics"] = BuildDiagnostics(); _pages["Repair"] = BuildRepair();
-            PageHost.Content = _pages[_currentPage];
-            _menuBaseline = MenuFingerprint(); _optionsBaseline = OptionsFingerprint(); _firmwareBaseline = FirmwareFingerprint();
-            NoticeText.Text = _demo ? "Demo mode — explore every feature using sample boot entries. No boot settings on this PC are changed."
+            if (!snapshot.Entries.Any(x => x.Id == optionsEntryId && x.IsWindows)) optionsEntryId = snapshot.Entries.FirstOrDefault(x => x.IsCurrent && x.IsWindows)?.Id ?? snapshot.Entries.FirstOrDefault(x => x.IsWindows)?.Id ?? "";
+            pages.Clear();
+            pages["Overview"] = BuildOverview(); pages["Windows boot"] = BuildMenu();
+            pages["Entry options"] = BuildOptions(); pages["Firmware"] = BuildFirmware();
+            pages["Backups"] = BuildBackups(); pages["Diagnostics"] = BuildDiagnostics(); pages["Repair"] = BuildRepair();
+            PageHost.Content = pages[currentPage];
+            menuBaseline = MenuFingerprint(); optionsBaseline = OptionsFingerprint(); firmwareBaseline = FirmwareFingerprint();
+            NoticeText.Text = demo ? "Demo mode — explore every feature using sample boot entries. No boot settings on this PC are changed."
                 : snapshot.RequiresAdministrator ? "Some boot settings need administrator access. Load them as administrator to view and manage this PC's complete configuration."
                 : "Changes apply to this PC. Windows asks for administrator approval when needed. You choose when to restart.";
             if (snapshot.Errors.Count > 0) NoticeText.Text += " " + string.Join(" ", snapshot.Errors);
         }
-        finally { _rendering = false; }
+        finally { rendering = false; }
     }
 
     private void RefreshMetadata()
     {
-        _pages["Overview"] = BuildOverview(); _pages["Backups"] = BuildBackups();
-        if (_currentPage is "Overview" or "Backups") PageHost.Content = _pages[_currentPage];
+        pages["Overview"] = BuildOverview(); pages["Backups"] = BuildBackups();
+        if (currentPage is "Overview" or "Backups") PageHost.Content = pages[currentPage];
     }
-    private BootEntry? SelectedWindows => _entryPicker.SelectedItem as BootEntry;
-    private FirmwareEntry? SelectedFirmware => _firmwarePicker.SelectedItem as FirmwareEntry;
-    private BackupInfo? SelectedBackup => (_backups.SelectedItem as ListBoxItem)?.Tag as BackupInfo;
+    private BootEntry? SelectedWindows => entryPicker.SelectedItem as BootEntry;
+    private FirmwareEntry? SelectedFirmware => firmwarePicker.SelectedItem as FirmwareEntry;
+    private BackupInfo? SelectedBackup => (backups.SelectedItem as ListBoxItem)?.Tag as BackupInfo;
     private static string Fingerprint(object value) => JsonSerializer.Serialize(value, BootJson.Options);
-    private string MenuFingerprint() => _snapshot is null ? "" : Fingerprint(new { Default = (_defaultEntry.SelectedItem as BootEntry)?.Id, Timeout = _timeout.Text, Show = _displayMenu.IsChecked, Order = _menuOrder.Items.OfType<BootEntry>().Select(x => x.Id).ToList() });
-    private string OptionsFingerprint() => _snapshot is null ? "" : Fingerprint(new { Id = _optionsEntryId, Options = ReadOptions() });
-    private string FirmwareFingerprint() => _snapshot is null ? "" : Fingerprint(_firmwareOrder.Items.OfType<FirmwareEntry>().Select(x => x.Id).ToList());
-    private BootEntryOptions ReadOptions() => new() { SafeBoot = _safeBoot.SelectedItem as string ?? "Off", BootLog = _bootLog.IsChecked == true, Sos = _sos.IsChecked == true, BaseVideo = _baseVideo.IsChecked == true, RecoveryEnabled = _recovery.IsChecked == true, MenuPolicy = _menuPolicy.SelectedItem as string ?? "Standard" };
+    private string MenuFingerprint() => snapshot is null ? "" : Fingerprint(new { Default = (defaultEntry.SelectedItem as BootEntry)?.Id, Timeout = timeout.Text, Show = displayMenu.IsChecked, Order = menuOrder.Items.OfType<BootEntry>().Select(x => x.Id).ToList() });
+    private string OptionsFingerprint() => snapshot is null ? "" : Fingerprint(new { Id = optionsEntryId, Options = ReadOptions() });
+    private string FirmwareFingerprint() => snapshot is null ? "" : Fingerprint(firmwareOrder.Items.OfType<FirmwareEntry>().Select(x => x.Id).ToList());
+    private BootEntryOptions ReadOptions() => new() { SafeBoot = safeBoot.SelectedItem as string ?? "Off", BootLog = bootLog.IsChecked == true, Sos = sos.IsChecked == true, BaseVideo = baseVideo.IsChecked == true, RecoveryEnabled = recovery.IsChecked == true, MenuPolicy = menuPolicy.SelectedItem as string ?? "Standard" };
 
     internal async Task<bool> ApplyMenuAsync()
     {
-        if (!int.TryParse(_timeout.Text, out var seconds) || seconds is < 0 or > 300) { ShowError("Enter a boot menu timeout of 0–300 seconds."); return false; }
-        var menu = new BootMenuSettings { DefaultId = (_defaultEntry.SelectedItem as BootEntry)?.Id ?? "", Timeout = seconds, DisplayMenu = _displayMenu.IsChecked == true, Order = _menuOrder.Items.OfType<BootEntry>().Select(x => x.Id).ToList() };
-        return await RunMutationAsync(new BootRequest { Operation = BootOperation.SetMenu, Menu = menu }, "Apply Windows boot settings?", $"Default: {(_defaultEntry.SelectedItem as BootEntry)?.Description}\nTimeout: {seconds} seconds\nShow boot menu: {(menu.DisplayMenu ? "Yes" : "No")}\n\nBoot order:\n" + string.Join("\n", _menuOrder.Items.OfType<BootEntry>().Select((x, i) => $"{i + 1}. {x.Description}")));
+        if (!int.TryParse(timeout.Text, out var seconds) || seconds is < 0 or > 300) { ShowError("Enter a boot menu timeout of 0–300 seconds."); return false; }
+        var menu = new BootMenuSettings { DefaultId = (defaultEntry.SelectedItem as BootEntry)?.Id ?? "", Timeout = seconds, DisplayMenu = displayMenu.IsChecked == true, Order = menuOrder.Items.OfType<BootEntry>().Select(x => x.Id).ToList() };
+        return await RunMutationAsync(new BootRequest { Operation = BootOperation.SetMenu, Menu = menu }, "Apply Windows boot settings?", $"Default: {(defaultEntry.SelectedItem as BootEntry)?.Description}\nTimeout: {seconds} seconds\nShow boot menu: {(menu.DisplayMenu ? "Yes" : "No")}\n\nBoot order:\n" + string.Join("\n", menuOrder.Items.OfType<BootEntry>().Select((x, i) => $"{i + 1}. {x.Description}")));
     }
     internal async Task<bool> ApplyOptionsAsync()
     {
@@ -210,20 +210,20 @@ public partial class MainWindow : Window
         var options = ReadOptions();
         return await RunMutationAsync(new BootRequest { Operation = BootOperation.SetEntryOptions, TargetId = entry.Id, Options = options }, "Apply entry options?", $"Entry: {entry.Description}\nSafe mode: {options.SafeBoot}\nBoot log: {options.BootLog}\nShow driver names: {options.Sos}\nBasic video: {options.BaseVideo}\nRecovery: {options.RecoveryEnabled}\nBoot menu style: {options.MenuPolicy}");
     }
-    internal async Task<bool> ApplyFirmwareOrderAsync() => await RunMutationAsync(new BootRequest { Operation = BootOperation.SetFirmwareOrder, Order = _firmwareOrder.Items.OfType<FirmwareEntry>().Select(x => x.Id).ToList() }, "Apply firmware boot order?", "The firmware will try entries in this order:\n\n" + string.Join("\n", _firmwareOrder.Items.OfType<FirmwareEntry>().Select((x, i) => $"{i + 1}. {x.Description}")));
+    internal async Task<bool> ApplyFirmwareOrderAsync() => await RunMutationAsync(new BootRequest { Operation = BootOperation.SetFirmwareOrder, Order = firmwareOrder.Items.OfType<FirmwareEntry>().Select(x => x.Id).ToList() }, "Apply firmware boot order?", "The firmware will try entries in this order:\n\n" + string.Join("\n", firmwareOrder.Items.OfType<FirmwareEntry>().Select((x, i) => $"{i + 1}. {x.Description}")));
 
     private void IncludeMenuEntry()
     {
-        if (_menuEntryPicker.SelectedItem is not BootEntry entry) return;
-        if (!_menuOrder.Items.OfType<BootEntry>().Any(x => x.Id == entry.Id)) _menuOrder.Items.Add(entry);
-        _menuOrder.SelectedItem = entry;
+        if (menuEntryPicker.SelectedItem is not BootEntry entry) return;
+        if (!menuOrder.Items.OfType<BootEntry>().Any(x => x.Id == entry.Id)) menuOrder.Items.Add(entry);
+        menuOrder.SelectedItem = entry;
     }
     private void ExcludeMenuEntry()
     {
-        if (_menuOrder.SelectedItem is not BootEntry entry) return;
-        if (entry.IsCurrent || (_defaultEntry.SelectedItem as BootEntry)?.Id == entry.Id || _menuOrder.Items.Count <= 1)
+        if (menuOrder.SelectedItem is not BootEntry entry) return;
+        if (entry.IsCurrent || (defaultEntry.SelectedItem as BootEntry)?.Id == entry.Id || menuOrder.Items.Count <= 1)
         { ShowError("Keep the running Windows entry and the selected default in the boot menu."); return; }
-        _menuOrder.Items.Remove(entry);
+        menuOrder.Items.Remove(entry);
     }
 
     private void Move(ListBox list, int delta)
@@ -246,7 +246,7 @@ public partial class MainWindow : Window
     }
     private async Task SetOnceAsync(bool firmware, bool clear)
     {
-        var id = firmware ? SelectedFirmware?.Id : (_currentPage == "Windows boot" ? (_menuOrder.SelectedItem as BootEntry)?.Id : SelectedWindows?.Id);
+        var id = firmware ? SelectedFirmware?.Id : (currentPage == "Windows boot" ? (menuOrder.SelectedItem as BootEntry)?.Id : SelectedWindows?.Id);
         var name = firmware ? SelectedFirmware?.Description : Snapshot.Entries.FirstOrDefault(x => x.Id == id)?.Description;
         if (!clear && id is null) { ShowError("Select a boot entry first."); return; }
         var operation = firmware ? clear ? BootOperation.ClearFirmwareBootOnce : BootOperation.SetFirmwareBootOnce : clear ? BootOperation.ClearBootOnce : BootOperation.SetBootOnce;
@@ -300,10 +300,10 @@ public partial class MainWindow : Window
         var dialog = new SaveFileDialog { Filter = "Text report (*.txt)|*.txt", FileName = "uoo-diagnostics.txt" }; if (dialog.ShowDialog(this) != true) return;
         try
         {
-            var report = $"Uoo Boot Manager — {(_demo ? "DEMO" : "LIVE")}\nGenerated {DateTimeOffset.Now:O}\n{Snapshot.Machine}\n{Snapshot.WindowsVersion}\n\n" + string.Join("\n\n", Snapshot.Diagnostics.Select(x => $"{x.Name}: {x.Status}\n{x.Detail}")) + "\n\n" + string.Join("\n", Snapshot.Errors);
+            var report = $"Uoo Boot Manager — {(demo ? "DEMO" : "LIVE")}\nGenerated {DateTimeOffset.Now:O}\n{Snapshot.Machine}\n{Snapshot.WindowsVersion}\n\n" + string.Join("\n\n", Snapshot.Diagnostics.Select(x => $"{x.Name}: {x.Status}\n{x.Detail}")) + "\n\n" + string.Join("\n", Snapshot.Errors);
             File.WriteAllText(dialog.FileName, report); StatusText.Text = "Diagnostics exported to " + dialog.FileName;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowError(ex.Message); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { ShowError(error.Message); }
     }
 
     private static string BackupLabel(BackupInfo backup)

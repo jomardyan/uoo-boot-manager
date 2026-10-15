@@ -299,7 +299,7 @@ class BootWindow(Adw.ApplicationWindow):
         self._add_button(page, "grub_refresh", "Rescan and rebuild GRUB…", self.refresh_grub)
 
     def _build_repair(self):
-        page = self._page("repair", "Repair", "Inspect and review a supported repair for this running Ubuntu installation. Uoo verifies the target again before reinstalling its boot loader.", "applications-utilities-symbolic")
+        page = self._page("repair", "Repair", "Inspect and review a supported repair for this running Ubuntu installation. Uoo verifies the target again before reinstalling its bootloader.", "applications-utilities-symbolic")
         self.repair_group = ui.group("Repair plan", "Repairs require administrator authentication, create a backup, and do not restart your computer.")
         self.repair_placeholder = ui.row("Inspect a fresh plan", "The plan identifies the boot mode, target, prerequisites, and steps.", "dialog-information-symbolic")
         self.repair_group.add(self.repair_placeholder)
@@ -320,7 +320,6 @@ class BootWindow(Adw.ApplicationWindow):
                 break
 
     def _key_pressed(self, _controller, keyval, _keycode, state):
-        from gi.repository import Gdk
         if state & Gdk.ModifierType.CONTROL_MASK and keyval in (ord("r"), ord("R")):
             self.reload()
             return True
@@ -418,7 +417,7 @@ class BootWindow(Adw.ApplicationWindow):
                 self.show_error("Uoo Boot Manager", exc)
             return
         if not self.installed:
-            self.show_error("Read-only session", "Install the Uoo .deb package to enable administrator actions.")
+            self.show_error("Read-only session", "Install the native Uoo package to enable administrator actions.")
             return
         self._job("Waiting for administrator authentication…", lambda: run_helper(request), callback)
 
@@ -528,7 +527,7 @@ class BootWindow(Adw.ApplicationWindow):
             self.banner.set_title("Preview mode — no system files or firmware are modified")
             self.banner.set_button_label("")
         elif not self.installed:
-            self.banner.set_title("Read-only session — install the Uoo .deb package to enable changes")
+            self.banner.set_title("Read-only session — install the native Uoo package to enable changes")
             self.banner.set_button_label("Diagnostics")
         elif self.snapshot.get("errors"):
             self.banner.set_title("Some boot settings could not be read")
@@ -913,12 +912,12 @@ class BootWindow(Adw.ApplicationWindow):
             return
         devices = [device for device in self.snapshot.get("devices", []) if device.get("partn") and device.get("esp")]
         if not devices:
-            self.show_error("EFI system partition", "No suitable EFI system partition was detected. Read as administrator and inspect Diagnostics.")
+            self.show_error("EFI System Partition", "No suitable EFI System Partition was detected. Read as administrator and inspect Diagnostics.")
             return
-        window, page = self._editor("Add EFI loader", "Create a firmware entry pointing to an existing .efi file on a detected EFI system partition.")
+        window, page = self._editor("Add EFI loader", "Create a firmware entry pointing to an existing .efi file on a detected EFI System Partition.")
         options = ui.group("Loader")
         label = ui.entry("Firmware label")
-        device_choice = ui.combo("EFI system partition", tuple(device["path"] for device in devices))
+        device_choice = ui.combo("EFI System Partition", tuple(device["path"] for device in devices))
         loader = ui.entry("Loader path (/EFI/…efi)")
         options.add(label)
         options.add(device_choice)
@@ -1151,7 +1150,7 @@ class BootWindow(Adw.ApplicationWindow):
         if not plan or not plan.get("supported"):
             return
         target = plan["confirmation"]
-        self._mutate({"action": "repair", "plan": plan["id"], "confirm": target}, "Execute boot-loader repair",
+        self._mutate({"action": "repair", "plan": plan["id"], "confirm": target}, "Execute bootloader repair",
                      f"Target: {target}\n\n" + "\n".join(plan.get("summary", [])) + f"\n\nType {target} to confirm.", "Repair", True, target)
 
     def _close_requested(self, _window):

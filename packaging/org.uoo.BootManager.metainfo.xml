@@ -3,6 +3,9 @@
   <id>org.uoo.BootManager</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
+  <developer id="io.github.jomardyan">
+    <name>Hayk Jomardyan</name>
+  </developer>
   <name>Uoo Boot Manager</name>
   <summary>Inspect boot options and manage supported Ubuntu boot settings</summary>
   <description>
@@ -13,4 +16,7 @@
   <url type="homepage">https://github.com/jomardyan/uoo-boot-manager</url>
   <provides><binary>uoo-boot-manager</binary></provides>
   <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="2.2.0" date="2026-10-16"/>
+  </releases>
 </component>

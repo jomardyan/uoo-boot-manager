@@ -6,7 +6,7 @@ using Uoo.Platform;
 
 namespace Uoo.Desktop;
 
-public partial class App : Application
+public sealed partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -23,7 +23,7 @@ public partial class App : Application
                 return;
             }
             var smoke = Array.IndexOf(e.Args, "--smoke-test");
-            var demo = smoke >= 0 || e.Args.Contains("--demo", StringComparer.OrdinalIgnoreCase);
+            var demo = smoke >= 0 || e.Args.Contains("--demo");
             var window = MakeWindow(demo);
             MainWindow = window;
             window.Show();

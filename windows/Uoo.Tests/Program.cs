@@ -7,7 +7,7 @@ int passed = 0, failed = 0;
 async Task Test(string name, Func<Task> test)
 {
     try { await test(); Console.WriteLine("PASS " + name); passed++; }
-    catch (Exception ex) { Console.Error.WriteLine("FAIL " + name + ": " + ex); failed++; }
+    catch (Exception error) { Console.Error.WriteLine("FAIL " + name + ": " + error); failed++; }
 }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 async Task<BootSnapshot> Inspect(IBootService service)

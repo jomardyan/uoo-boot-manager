@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Reflection.PortableExecutable;
 using System.Security.Principal;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Globalization;
 using System.Security.Cryptography;
 using Microsoft.Win32;
@@ -53,7 +54,7 @@ internal static class WindowsMachine
             foreach (ManagementObject item in objects)
             using (item)
             {
-                if (item["LastBootUpTime"] is not string value || !System.Text.RegularExpressions.Regex.IsMatch(value, @"^[0-9]{14}\.[0-9]{6}[+-][0-9]{3}$")) return "";
+                if (item["LastBootUpTime"] is not string value || !Regex.IsMatch(value, @"^[0-9]{14}\.[0-9]{6}[+-][0-9]{3}\z")) return "";
                 times.Add(ManagementDateTimeConverter.ToDateTime(value).ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
             }
             if (times.Count != 1) return "";
@@ -65,7 +66,7 @@ internal static class WindowsMachine
             var eventIdentity = recordId.ToString(CultureInfo.InvariantCulture) + "\n" + createdAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(MachineId + "\n" + times[0] + "\n" + eventIdentity)));
         }
-        catch (Exception error) when (error is ManagementException or EventLogException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException or ArgumentException or IOException or InvalidOperationException or System.Security.SecurityException)
+        catch (Exception error) when (error is ManagementException or EventLogException or UnauthorizedAccessException or COMException or ArgumentException or IOException or InvalidOperationException or System.Security.SecurityException)
         { return ""; }
     }
 
@@ -95,8 +96,8 @@ internal static class WindowsMachine
                 !safeDisks.Contains(Convert.ToUInt32(item["DiskNumber"])) || Convert.ToBoolean(item["IsReadOnly"]) ||
                 Convert.ToBoolean(item["IsOffline"])) continue;
             var paths = item["AccessPaths"] as string[] ?? [];
-            var volume = paths.FirstOrDefault(p => System.Text.RegularExpressions.Regex.IsMatch(p,
-                @"^\\\\\?\\Volume\{[0-9a-fA-F-]{36}\}\\$"));
+            var volume = paths.FirstOrDefault(p => Regex.IsMatch(p,
+                @"^\\\\\?\\Volume\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}\\\z"));
             if (volume is null) continue;
             var fileSystem = new StringBuilder(256);
             if (!GetVolumeInformation(volume, null, 0, out _, out _, out var flags, fileSystem, (uint)fileSystem.Capacity) ||
@@ -113,7 +114,7 @@ internal static class WindowsMachine
         var candidates = Partitions().Where(p => p.Volume.Equals(path.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) ||
             p.Device.Equals(path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)).ToList();
         // A drive root is accepted only if it resolves to the exact validated ESP volume.
-        if (candidates.Count == 0 && System.Text.RegularExpressions.Regex.IsMatch(path, @"^[A-Za-z]:\\?$"))
+        if (candidates.Count == 0 && Regex.IsMatch(path, @"^[A-Za-z]:\\?\z"))
         {
             var device = NativeVolume(path[..2]);
             candidates = Partitions().Where(p => p.Device.Equals(device, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -141,7 +142,7 @@ internal static class WindowsMachine
         using (item)
         {
             if (Convert.ToUInt32(item["DriveType"]) is not (2 or 3) || item["DeviceID"] is not string volume ||
-                !System.Text.RegularExpressions.Regex.IsMatch(volume, @"^\\\\\?\\Volume\{[0-9a-fA-F-]{36}\}\\$")) continue;
+                !Regex.IsMatch(volume, @"^\\\\\?\\Volume\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}\\\z")) continue;
             var fileSystem = new StringBuilder(256);
             if (!GetVolumeInformation(volume, null, 0, out _, out _, out _, fileSystem, (uint)fileSystem.Capacity)) continue;
             try { volumes.Add((volume, NativeVolume(volume))); }
@@ -165,7 +166,7 @@ internal static class WindowsMachine
             using var file = File.OpenRead(loader); using var pe = new PEReader(file);
             var headers = pe.PEHeaders;
             var machine = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? Machine.Arm64 : Machine.Amd64;
-            if (headers.PEHeader is null || headers.PEHeader.Magic != PEMagic.PE32Plus || headers.PEHeader.Subsystem != (Subsystem)16 ||
+            if (headers.PEHeader is null || headers.PEHeader.Magic != PEMagic.PE32Plus || headers.PEHeader.Subsystem != Subsystem.WindowsBootApplication ||
                 headers.CoffHeader.Machine != machine || !headers.CoffHeader.Characteristics.HasFlag(Characteristics.ExecutableImage))
                 throw new ArgumentException("The selected Windows loader is not a native 64-bit Windows boot application.");
         }
@@ -253,7 +254,7 @@ internal static class WindowsMachine
                 }
             return (null, "No readable BitLocker status for the running Windows volume.");
         }
-        catch (Exception error) when (error is ManagementException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        catch (Exception error) when (error is ManagementException or UnauthorizedAccessException or COMException)
         { return (null, "BitLocker status could not be read: " + error.Message); }
     }
 
@@ -282,7 +283,7 @@ internal static class WindowsMachine
             return new() { Available = true, WindowsDirectory = WindowsDirectory, SystemPartition = esp[0].Volume,
                 Description = "Refresh the running Windows boot files and BCD on the verified system ESP, preserving menu settings and firmware order.", Confirmation = "REPAIR" };
         }
-        catch (Exception error) when (error is ManagementException or IOException or UnauthorizedAccessException or InvalidOperationException or System.Runtime.InteropServices.COMException)
+        catch (Exception error) when (error is ManagementException or IOException or UnauthorizedAccessException or InvalidOperationException or COMException)
         { return new() { Available = false, Reason = error.Message }; }
     }
 

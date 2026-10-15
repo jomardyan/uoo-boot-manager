@@ -13,7 +13,7 @@ import zlib
 
 from . import platform as facts
 from .features import state_bytes
-from .storage import file_state, read_regular
+from .storage import file_state, read_regular, restore_file
 
 
 class Repair:
@@ -260,7 +260,6 @@ class Repair:
             try:
                 self.restore_boot_tree(tree)
                 self.restore_bios_state(state)
-                from .storage import restore_file
                 restore_file(self.paths.config, files["generated"])
                 self.store.finish()
             except Exception as rollback:

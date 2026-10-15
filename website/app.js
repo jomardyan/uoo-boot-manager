@@ -22,7 +22,7 @@ for (const tab of document.querySelectorAll('[data-platform]')) {
     const windows = tab.dataset.platform === 'windows';
     document.querySelector('#windows-preview').hidden = !windows;
     document.querySelector('#ubuntu-preview').hidden = windows;
-    document.querySelector('#preview-caption').textContent = windows ? 'Windows workflow illustration. Available options depend on your system.' : 'The native Ubuntu desktop, shown in demo mode. No system changes are made.';
+    document.querySelector('#preview-caption').textContent = windows ? 'The native Windows desktop, shown in demo mode. Available options depend on your system.' : 'The native Ubuntu desktop, shown in demo mode. No system changes are made.';
     for (const other of document.querySelectorAll('[data-platform]')) {
       const selected = other === tab;
       other.classList.toggle('selected', selected);

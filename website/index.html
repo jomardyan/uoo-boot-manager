@@ -9,7 +9,7 @@
   <meta property="og:title" content="Uoo Boot Manager — A clear start. Every time.">
   <meta property="og:description" content="Native boot configuration for Windows 11 and Ubuntu. Choose what starts next, review changes, and keep a recovery path.">
   <meta property="og:url" content="https://uoo.lolisoft.eu/">
-  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/app-preview.png">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
   <link rel="canonical" href="https://uoo.lolisoft.eu/">
   <link rel="icon" href="assets/icons/favicon.ico" sizes="any">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
@@ -52,24 +52,9 @@
           <button type="button" class="preview-tab selected" data-platform="windows" aria-pressed="true">Windows 11</button>
           <button type="button" class="preview-tab" data-platform="ubuntu" aria-pressed="false">Ubuntu</button>
         </div>
-        <div class="app-window" id="windows-preview" role="img" aria-label="Illustration of the Windows boot workflow: Windows 11 as the default choice, Ubuntu as a second entry, and a 10-second timeout.">
-          <div class="app-titlebar"><span><img src="assets/icons/uoo.svg" alt="" width="21" height="21">Uoo Boot Manager</span><span class="window-controls" aria-hidden="true">─ &nbsp; □ &nbsp; ×</span></div>
-          <div class="app-workspace">
-            <div class="app-sidebar" aria-hidden="true"><span>⌂</span><span class="active">▣</span><span>☷</span><span>↶</span><span>⚙</span></div>
-            <div class="app-page">
-              <div class="app-page-heading"><div><span class="eyebrow">YOUR WORKSTATION</span><h2>Windows boot</h2></div><span class="local-badge">Local</span></div>
-              <p>Choose what starts next.</p>
-              <div class="boot-list">
-                <div class="boot-entry"><span class="os-logo windows-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span><strong>Windows 11</strong><small>Current operating system</small></span><span class="default-badge">Default</span></div>
-                <div class="boot-entry"><span class="os-logo ubuntu-logo" aria-hidden="true">◉</span><span><strong>Ubuntu</strong><small>UEFI firmware entry</small></span><span class="entry-arrow" aria-hidden="true">›</span></div>
-              </div>
-              <div class="setting-row"><span>Menu timeout</span><span class="setting-value">10 <span>seconds</span></span></div>
-              <div class="review-row"><span class="review-check" aria-hidden="true">✓</span>Changes are reviewed before applying.</div>
-            </div>
-          </div>
-        </div>
+        <div class="native-preview" id="windows-preview"><img src="assets/windows-preview.png" width="1028" height="720" alt="The native Uoo Windows desktop in demo mode, showing default boot entry, menu timeout, boot order, and administrator controls."></div>
         <div class="ubuntu-preview" id="ubuntu-preview" hidden><img src="assets/app-preview.png" width="1120" height="740" alt="The Uoo Ubuntu desktop showing its boot menu, default operating-system choice, timeout, and one-time boot controls."></div>
-        <figcaption id="preview-caption">Windows workflow illustration. Available options depend on your system.</figcaption>
+        <figcaption id="preview-caption">The native Windows desktop, shown in demo mode. Available options depend on your system.</figcaption>
       </figure>
     </section>
 

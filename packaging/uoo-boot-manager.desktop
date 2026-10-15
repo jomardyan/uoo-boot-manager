@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Uoo Boot Manager
+GenericName=Boot Manager
+Comment=Manage Ubuntu GRUB settings and UEFI boot order
+Exec=uoo-boot-manager
+Icon=uoo-boot-manager
+Terminal=false
+Categories=System;
+Keywords=boot;grub;uefi;firmware;
+StartupNotify=false
+StartupWMClass=org.uoo.BootManager

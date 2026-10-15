@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <Version>2.1.0</Version>
+    <Company>Uoo</Company>
+    <Product>Uoo Boot Manager</Product>
+    <Copyright>Uoo Boot Manager contributors</Copyright>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+  </PropertyGroup>
+</Project>

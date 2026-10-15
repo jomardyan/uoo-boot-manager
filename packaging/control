@@ -1,0 +1,12 @@
+Package: uoo-boot-manager
+Version: 2.1.0
+Section: admin
+Priority: optional
+Architecture: all
+Maintainer: Uoo Boot Manager contributors <uoo@example.invalid>
+Depends: python3 (>= 3.10), python3-gi, gir1.2-gtk-4.0 (>= 4.6), gir1.2-adw-1 (>= 1.5), polkitd | policykit-1, pkexec | policykit-1
+Recommends: grub2-common, efibootmgr
+Description: Native desktop manager for Ubuntu boot settings
+ Manage GRUB menus, custom boot entries, one-time boot choices, UEFI firmware
+ options, backups, and supported bootloader repair on Ubuntu.
+ System changes use an authenticated helper and include backups.

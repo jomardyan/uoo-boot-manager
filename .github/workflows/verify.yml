@@ -1,0 +1,480 @@
+name: Build Linux packages
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_vm:
+        description: Run disposable Ubuntu UEFI boot integration
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-packages-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package-and-tests:
+    name: Test and build Debian package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      epoch: ${{ steps.metadata.outputs.epoch }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate release metadata
+        id: metadata
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$(/usr/bin/python3 scripts/package-version.py)"
+          if [[ "$REF_TYPE" == tag && "$REF_NAME" != "v$version" ]]; then
+            printf 'Release tag must be v%s, got %s\n' "$version" "$REF_NAME" >&2
+            exit 1
+          fi
+          epoch="$(git show -s --format=%ct HEAD)"
+          printf 'version=%s\nepoch=%s\n' "$version" "$epoch" >> "$GITHUB_OUTPUT"
+          printf 'SOURCE_DATE_EPOCH=%s\n' "$epoch" >> "$GITHUB_ENV"
+      - name: Install build and desktop test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            dpkg-dev grub2-common python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
+            desktop-file-utils xvfb xauth dbus-x11 fonts-dejavu-core
+      - name: Build and validate Debian package
+        run: |
+          bash scripts/build-deb.sh
+          /usr/bin/python3 scripts/check-package.py dist/uoo-boot-manager_*_all.deb
+          desktop-file-validate packaging/uoo-boot-manager.desktop
+      - name: Run unit and GTK interaction tests
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: dbus-run-session -- xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -v
+      - name: Install and smoke-test the packaged desktop
+        env:
+          GDK_BACKEND: x11
+          GSK_RENDERER: cairo
+        run: |
+          sudo apt-get install -y --no-install-recommends ./dist/uoo-boot-manager_*_all.deb
+          dbus-run-session -- xvfb-run -a /usr/bin/python3 scripts/smoke-desktop.py -- /usr/bin/uoo-boot-manager
+      - name: Upload Debian package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  rpm:
+    name: Build and test Fedora RPM
+    needs: package-and-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download validated Debian payload
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-deb
+          path: dist
+      - name: Install RPM build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends rpm
+      - name: Build and validate RPM
+        run: bash scripts/build-rpm.sh dist/uoo-boot-manager_*_all.deb
+      - name: Install and smoke-test in Fedora 44
+        run: |
+          docker run --rm \
+            -v "$PWD/dist:/packages:ro" \
+            -v "$PWD/scripts/smoke-desktop.py:/smoke-desktop.py:ro" \
+            fedora:44 bash -euc '
+              dnf install -y /packages/*.rpm xorg-x11-server-Xvfb xorg-x11-xauth dbus-daemon dejavu-sans-fonts desktop-file-utils
+              desktop-file-validate /usr/share/applications/uoo-boot-manager.desktop
+              GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 /smoke-desktop.py -- /usr/bin/uoo-boot-manager
+              rpm -V uoo-boot-manager
+            '
+      - name: Upload RPM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-rpm
+          path: dist/*.rpm
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  appimage:
+    name: Build and test ${{ matrix.arch }} AppImage
+    needs: package-and-tests
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+            tool_sha: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+            runtime_sha: 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            tool_sha: f0837e7448a0c1e4e650a93bb3e85802546e60654ef287576f46c71c126a9158
+            runtime_sha: 00cbdfcf917cc6c0ff6d3347d59e0ca1f7f45a6df1a428a0d6d8a78664d87444
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Python and GTK bundling dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            python3-venv python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 \
+            binutils patchelf squashfs-tools desktop-file-utils
+          /usr/bin/python3 -m venv --system-site-packages build/appimage-venv
+          build/appimage-venv/bin/python -m pip install -r packaging/appimage-requirements.txt
+      - name: Download pinned AppImage tools and verify checksums
+        env:
+          BUILD_ARCH: ${{ matrix.arch }}
+          TOOL_SHA: ${{ matrix.tool_sha }}
+          RUNTIME_SHA: ${{ matrix.runtime_sha }}
+        run: |
+          mkdir -p build/tools
+          curl --fail --location --retry 3 \
+            "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-$BUILD_ARCH.AppImage" \
+            --output build/tools/appimagetool.AppImage
+          curl --fail --location --retry 3 \
+            "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-$BUILD_ARCH" \
+            --output build/tools/runtime
+          printf '%s\n' \
+            "$TOOL_SHA  build/tools/appimagetool.AppImage" \
+            "$RUNTIME_SHA  build/tools/runtime" \
+            | sha256sum --check --strict
+          chmod +x build/tools/appimagetool.AppImage
+      - name: Bundle Python, GTK4, and libadwaita into AppImage
+        run: |
+          BUILD_PYTHON="$PWD/build/appimage-venv/bin/python" \
+            APPIMAGETOOL="$PWD/build/tools/appimagetool.AppImage" \
+            APPIMAGETOOL_RUNTIME_FILE="$PWD/build/tools/runtime" \
+            bash scripts/build-appimage.sh
+      - name: Test without host GTK or PyGObject installed
+        run: |
+          docker run --rm \
+            -v "$PWD/dist:/packages:ro" \
+            -v "$PWD/scripts/smoke-desktop.py:/smoke-desktop.py:ro" \
+            ubuntu:24.04 bash -euc '
+              apt-get update -qq
+              apt-get install -y --no-install-recommends python3 xvfb xauth dbus-x11 fonts-dejavu-core libgl1 libegl1 libwayland-client0 libwayland-cursor0 libwayland-egl1
+              APPIMAGE_EXTRACT_AND_RUN=1 GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 /smoke-desktop.py -- /packages/*.AppImage
+            '
+      - name: Upload AppImage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-appimage-${{ matrix.arch }}
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  opensuse:
+    name: Build and test openSUSE RPM
+    needs: package-and-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist
+      - run: sudo apt-get update -qq && sudo apt-get install --no-install-recommends -y rpm
+      - run: bash scripts/build-rpm.sh --opensuse dist/uoo-boot-manager_*_all.deb
+      - name: Install and test on openSUSE Tumbleweed
+        run: |
+          docker run --rm -v "$PWD/dist:/packages:ro" \
+            -v "$PWD/scripts/smoke-desktop.py:/smoke-desktop.py:ro" \
+            opensuse/tumbleweed:latest bash -euc '
+              zypper --non-interactive install --allow-unsigned-rpm --no-recommends /packages/*.opensuse.noarch.rpm xvfb-run xorg-x11-server-Xvfb xauth dbus-1-daemon dejavu-fonts desktop-file-utils
+              desktop-file-validate /usr/share/applications/uoo-boot-manager.desktop
+              GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 /smoke-desktop.py -- /usr/bin/uoo-boot-manager
+              rpm -V uoo-boot-manager
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: linux-opensuse
+          path: dist/*.opensuse.noarch.rpm
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  arch:
+    name: Build and test Arch and Manjaro package
+    needs: package-and-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SOURCE_DATE_EPOCH: ${{ needs.package-and-tests.outputs.epoch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist
+      - name: Build without root, install, and test on Arch
+        run: |
+          mkdir -p build
+          docker run --rm -e SOURCE_DATE_EPOCH -v "$PWD:/work" -w /work \
+            archlinux:base-devel bash -euc '
+              pacman -Syu --noconfirm --needed dpkg python zstd xorg-server-xvfb xorg-xauth dbus ttf-dejavu desktop-file-utils
+              useradd -m -u "$(stat -c %u /work)" builder
+              chown builder build dist
+              runuser -u builder -- bash scripts/build-arch.sh dist/uoo-boot-manager_*_all.deb
+              sed -i '/^[[:space:]]*NoExtract[[:space:]]*=/d' /etc/pacman.conf
+              pacman -U --noconfirm dist/*.pkg.tar.zst
+              desktop-file-validate /usr/share/applications/uoo-boot-manager.desktop
+              GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /usr/bin/uoo-boot-manager
+              pacman -Qkk uoo-boot-manager
+            '
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: linux-arch
+          path: dist/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  arm64-desktop:
+    name: Install native Debian package on ARM64
+    needs: package-and-tests
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ./dist/uoo-boot-manager_*_all.deb xvfb xauth dbus-x11 fonts-dejavu-core
+          GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /usr/bin/uoo-boot-manager
+          GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 -m unittest discover -s tests -p test_gtk_ui.py -v
+
+  flatpak:
+    name: Build and test ${{ matrix.arch }} Flatpak
+    needs: package-and-tests
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist
+      - name: Install Flatpak tools and runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y flatpak flatpak-builder librsvg2-common xvfb xauth dbus-x11 fonts-dejavu-core
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
+      - run: bash scripts/build-flatpak.sh
+      - name: Install and test the bundle and host bridge
+        run: |
+          flatpak install --user --noninteractive -y dist/*.flatpak
+          GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- flatpak run org.uoo.BootManager
+          sudo apt-get install --no-install-recommends -y ./dist/uoo-boot-manager_*_all.deb
+          dbus-run-session -- flatpak run --command=flatpak-spawn org.uoo.BootManager --host /usr/bin/uoo-boot-inspect --probe | tee build/host-probe.json
+          python3 -c 'import json; p=json.load(open("build/host-probe.json")); assert p["ok"] and p["installed"]'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: linux-flatpak-${{ matrix.arch }}
+          path: dist/*.flatpak
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  snap:
+    name: Build and test ${{ matrix.arch }} Snap
+    needs: [package-and-tests, appimage]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-appimage-${{ matrix.arch }}
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: linux-deb
+          path: dist
+      - name: Install Snapcraft and desktop prerequisites
+        run: |
+          sudo snap install snapcraft --classic
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y ./dist/uoo-boot-manager_*_all.deb xvfb xauth dbus-x11 fonts-dejavu-core libgl1 libegl1 libwayland-client0 libwayland-cursor0 libwayland-egl1
+      - run: bash scripts/build-snap.sh dist/*.AppImage
+      - name: Install and test the classic Snap
+        run: |
+          sudo snap install --dangerous --classic dist/*.snap
+          GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 scripts/smoke-desktop.py -- /snap/bin/uoo-boot-manager
+          printf '%s\n' '/usr/bin/uoo-boot-inspect --probe' | snap run --shell uoo-boot-manager | tee build/snap-host-probe.json
+          grep '"installed": true' build/snap-host-probe.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: linux-snap-${{ matrix.arch }}
+          path: dist/*.snap
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  uefi-vm:
+    name: Optional boot integration (${{ matrix.mode }})
+    needs: package-and-tests
+    if: github.event_name == 'workflow_dispatch' && inputs.run_vm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: uefi
+            flags: ""
+          - mode: secure-boot
+            flags: --secure-boot
+          - mode: bios
+            flags: --boot-mode bios
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install --no-install-recommends -y qemu-system-x86 qemu-utils ovmf xorriso
+      - run: bash scripts/build-deb.sh
+      - run: python3 scripts/vm-integration.py --package dist/uoo-boot-manager_*_all.deb --work-dir /tmp/uoo-vm-ci --exercise ${{ matrix.flags }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ${{ matrix.mode }}-guest-logs
+          path: |
+            /tmp/uoo-vm-ci/serial.log
+            /tmp/uoo-vm-ci/qemu.log
+            /tmp/uoo-vm-ci/vm.json
+            /tmp/uoo-vm-ci/integration-*.log
+
+  collect:
+    name: Collect packages and SHA256 checksums
+    needs: [package-and-tests, rpm, opensuse, arch, appimage, arm64-desktop, flatpak, snap]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Download all packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: linux-*
+          merge-multiple: true
+          path: dist
+      - name: Generate and verify checksums
+        run: |
+          python3 scripts/release-checksums.py dist
+          (cd dist && sha256sum --check SHA256SUMS)
+          {
+            printf '### Linux packages\n\n'
+            printf 'Download **linux-packages** for all distro formats, both CPU architectures, and SHA256SUMS.\n\n'
+            printf '```text\n'
+            cat dist/SHA256SUMS
+            printf '```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload complete package set
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-packages
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  release:
+    name: Attach packages to draft release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [package-and-tests, collect]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download complete package set
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-packages
+          path: dist
+      - name: Create draft release and attach packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Uoo Boot Manager $RELEASE_TAG" --generate-notes || \
+              gh release view "$RELEASE_TAG" >/dev/null
+          fi
+          if [[ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != true ]]; then
+            printf 'Release %s is already published; refusing to replace its assets.\n' "$RELEASE_TAG" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" dist/* --clobber

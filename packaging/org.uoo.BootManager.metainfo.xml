@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.uoo.BootManager</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-Not-Specified</project_license>
+  <name>Uoo Boot Manager</name>
+  <summary>Inspect boot options and manage supported Ubuntu boot settings</summary>
+  <description>
+    <p>Manage GRUB menus, firmware boot entries, custom entries, appearance, backups, and diagnostics with a native GTK4 desktop.</p>
+    <p>System mode requires the matching native Uoo package on the host. Changes authenticate through its installed administrator helper. Demo mode works independently.</p>
+  </description>
+  <launchable type="desktop-id">org.uoo.BootManager.desktop</launchable>
+  <url type="homepage">https://github.com/jomardyan/uoo-boot-manager</url>
+  <provides><binary>uoo-boot-manager</binary></provides>
+  <content_rating type="oars-1.1"/>
+</component>

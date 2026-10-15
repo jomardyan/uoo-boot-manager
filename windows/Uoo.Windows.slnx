@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="Uoo.Core/Uoo.Core.csproj" />
+  <Project Path="Uoo.Desktop/Uoo.Desktop.csproj" />
+  <Project Path="Uoo.Helper/Uoo.Helper.csproj" />
+  <Project Path="Uoo.Platform.Tests/Uoo.Platform.Tests.csproj" />
+  <Project Path="Uoo.Platform/Uoo.Platform.csproj" />
+  <Project Path="Uoo.Tests/Uoo.Tests.csproj" />
+</Solution>

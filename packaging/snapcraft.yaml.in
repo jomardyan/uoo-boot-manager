@@ -1,0 +1,20 @@
+name: uoo-boot-manager
+version: '@VERSION@'
+summary: Native desktop for supported boot settings
+description: |
+  Manage boot configuration through the installed, authenticated native Uoo
+  helper. The matching native package is required for system changes.
+  Demo mode works independently. Bootloader repair supports verified Ubuntu
+  x86-64 layouts. This classic snap uses the host graphics stack.
+base: core24
+grade: stable
+confinement: classic
+platforms:
+  @SNAP_ARCH@:
+apps:
+  uoo-boot-manager:
+    command: AppRun
+parts:
+  desktop:
+    plugin: dump
+    source: desktop

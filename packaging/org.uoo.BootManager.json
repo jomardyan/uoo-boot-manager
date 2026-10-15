@@ -1,0 +1,26 @@
+{
+  "app-id": "org.uoo.BootManager",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "50",
+  "sdk": "org.gnome.Sdk",
+  "command": "uoo-boot-manager",
+  "finish-args": [
+    "--share=ipc", "--socket=fallback-x11", "--socket=wayland", "--device=dri",
+    "--talk-name=org.freedesktop.Flatpak"
+  ],
+  "modules": [{
+    "name": "uoo",
+    "buildsystem": "simple",
+    "build-commands": [
+      "install -Dm755 packaging/flatpak-launcher /app/bin/uoo-boot-manager",
+      "install -d /app/lib/uoo-boot-manager/uoo",
+      "install -m644 uoo/*.py /app/lib/uoo-boot-manager/uoo/",
+      "install -m644 packaging/launch.py /app/lib/uoo-boot-manager/launch.py",
+      "install -Dm644 packaging/uoo-boot-manager.desktop /app/share/applications/org.uoo.BootManager.desktop",
+      "sed -i 's/^Icon=.*/Icon=org.uoo.BootManager/' /app/share/applications/org.uoo.BootManager.desktop",
+      "install -Dm644 packaging/uoo-boot-manager.svg /app/share/icons/hicolor/scalable/apps/org.uoo.BootManager.svg",
+      "install -Dm644 packaging/org.uoo.BootManager.metainfo.xml /app/share/metainfo/org.uoo.BootManager.metainfo.xml"
+    ],
+    "sources": [{"type": "dir", "path": "..", "skip": [".git", "build", "dist", "__pycache__"]}]
+  }]
+}

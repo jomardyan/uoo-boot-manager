@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>2.1.0</Version>
+    <Version>2.1.2</Version>
     <Company>Uoo</Company>
     <Product>Uoo Boot Manager</Product>
     <Copyright>Uoo Boot Manager contributors</Copyright>

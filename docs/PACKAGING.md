@@ -59,9 +59,9 @@ For custom boot entries in Flatpak, enter filesystem-relative boot paths
 manually; other file choices use the desktop portal.
 
 ```sh
-flatpak install --user ./uoo-boot-manager-2.1.0-x86_64.flatpak
+flatpak install --user ./uoo-boot-manager-2.1.2-x86_64.flatpak
 flatpak run org.uoo.BootManager
-sudo snap install --dangerous --classic ./uoo-boot-manager_2.1.0_amd64.snap
+sudo snap install --dangerous --classic ./uoo-boot-manager_2.1.2_amd64.snap
 uoo-boot-manager
 ```
 
@@ -92,8 +92,8 @@ and `windows/Directory.Build.props`,
 commit the release sources, then push the matching tag:
 
 ```sh
-git tag v2.1.0
-git push origin v2.1.0
+git tag v2.1.2
+git push origin v2.1.2
 ```
 
 The workflow rejects a mismatched tag or metadata version. All tests and all
@@ -150,7 +150,7 @@ Build an Arch package as an ordinary user on Arch with `dpkg`, `base-devel`,
 Python, and zstd installed:
 
 ```sh
-bash scripts/build-arch.sh dist/uoo-boot-manager_2.1.0_all.deb
+bash scripts/build-arch.sh dist/uoo-boot-manager_2.1.2_all.deb
 ```
 
 Flatpak builds require `flatpak-builder` plus the GNOME 50 platform and SDK in
@@ -160,7 +160,7 @@ and a matching-architecture AppImage:
 ```sh
 flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
 bash scripts/build-flatpak.sh
-bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.1.0-x86_64.AppImage
+bash scripts/build-snap.sh dist/Uoo_Boot_Manager-2.1.2-x86_64.AppImage
 ```
 
 Snapcraft's destructive mode installs its build prerequisites on the build
@@ -170,5 +170,5 @@ modify boot settings. To run an AppImage where FUSE is unavailable:
 
 ```sh
 chmod +x dist/*.AppImage
-APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.1.0-x86_64.AppImage --demo
+APPIMAGE_EXTRACT_AND_RUN=1 ./dist/Uoo_Boot_Manager-2.1.2-x86_64.AppImage --demo
 ```

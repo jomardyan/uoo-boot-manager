@@ -1,8 +1,8 @@
-# Uoo 2.1 validation record
+# Uoo 2.1.2 validation record
 
 Validation dates: 14–15 October 2026. This report separates current 2.1 package and native-desktop CI from the historical 2.0 Ubuntu boot/reboot evidence. Ubuntu system management requires Ubuntu 24.04+ with an existing GRUB installation; its repair support is limited to the verified x86-64 plain-disk layouts described in the operational manual. The Windows 11 edition uses native WPF and a separately authenticated installed administrator helper.
 
-## Current 2.1 CI evidence
+## 2.1.0 baseline CI evidence
 
 | Scope | Recorded result | Evidence |
 | --- | --- | --- |
@@ -59,14 +59,14 @@ These commands build and test the current version. A new VM execution records ev
 
 ```sh
 bash scripts/build-deb.sh
-python3 scripts/check-package.py dist/uoo-boot-manager_2.1.0_all.deb
+python3 scripts/check-package.py dist/uoo-boot-manager_2.1.2_all.deb
 GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a \
   python3 -m unittest discover -s tests -v
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.0_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
   --work-dir /tmp/uoo-check-uefi --exercise
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.0_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
   --work-dir /tmp/uoo-check-secure --secure-boot --exercise
-python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.0_all.deb \
+python3 scripts/vm-integration.py --package dist/uoo-boot-manager_2.1.2_all.deb \
   --work-dir /tmp/uoo-check-bios --boot-mode bios --exercise
 ```
 

@@ -115,7 +115,7 @@ inspection, and transaction reports are uploaded separately as
 Download `windows-packages` for both installers, both ZIPs, and
 `SHA256SUMS-Windows`. Individual packages are in `windows-build-x64` and
 `windows-build-arm64`. Actions downloads expire after 30 days. Pushing the
-matching `v2.1.0` version tag attaches Windows downloads to a draft GitHub
+matching `v2.1.2` version tag attaches Windows downloads to a draft GitHub
 release, alongside the Linux assets. Publish the reviewed draft to make those
 files available on the Releases page.
 

@@ -31,7 +31,7 @@ From this directory on Ubuntu:
 
 ```sh
 bash scripts/build-deb.sh
-sudo apt install ./dist/uoo-boot-manager_2.1.0_all.deb
+sudo apt install ./dist/uoo-boot-manager_2.1.2_all.deb
 uoo-boot-manager
 ```
 
@@ -84,7 +84,7 @@ Run `python3 -m unittest discover -s tests -v` from this directory. Unit and fai
 
 ```sh
 GDK_BACKEND=x11 GSK_RENDERER=cairo xvfb-run -a python3 -m unittest discover -s tests -v
-python3 scripts/check-package.py dist/uoo-boot-manager_2.1.0_all.deb
+python3 scripts/check-package.py dist/uoo-boot-manager_2.1.2_all.deb
 ```
 
 `scripts/vm-integration.py` downloads a checksum-verified official Ubuntu image, boots an independent disposable QEMU overlay, and can install/exercise/reboot the package under UEFI, Secure Boot, or BIOS. It does not use host disks or install the package on the host. See [production requirements](docs/PRODUCTION.md) and the [release validation report](docs/VALIDATION.md) for gates and recorded results. The CI workflow runs unit/native/package checks and provides an opt-in virtual-machine matrix.

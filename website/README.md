@@ -13,11 +13,13 @@ guide and the matching Linux or Windows SHA256 manifest.
 Build and preview from the application repository root:
 
 ```sh
-node website/build.mjs
-python3 -m http.server 4173 --bind 127.0.0.1 --directory website/dist
+make website        # or: node website/build.mjs
+unzip website/dist/uoo-website.zip -d /tmp/uoo-site
+python3 -m http.server 4173 --bind 127.0.0.1 --directory /tmp/uoo-site
 ```
 
-For your hosting, upload **the contents of `website/dist/`** to the document
+The build writes a single archive, `website/dist/uoo-website.zip`, instead of
+a folder. For your hosting, extract **the contents of that ZIP** into the document
 root for `uoo.lolisoft.eu`. The page works on ordinary static web hosting;
 there is no Node.js process to run in production. Configure the domain and
 HTTPS through your existing provider.

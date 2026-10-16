@@ -1,0 +1,257 @@
+name: Publish to distribution platforms
+
+# Manual by design: uploads to Launchpad, the Snap Store, WinGet and the AUR
+# cannot be undone. Every publishing job waits for approval in the `release`
+# environment and starts only for the platforms you tick.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published release version (for example 2.2.1)
+        required: true
+        type: string
+      ppa:
+        description: Upload signed source packages to the Launchpad PPA
+        type: boolean
+        default: false
+      snap:
+        description: Upload the amd64 and arm64 Snaps to the Snap Store
+        type: boolean
+        default: false
+      snap_channel:
+        description: Snap Store channel (test on edge before stable)
+        type: choice
+        options: [edge, beta, candidate, stable]
+        default: edge
+      winget:
+        description: Open a WinGet community repository pull request
+        type: boolean
+        default: false
+      aur:
+        description: Update the uoo-boot-manager-bin AUR package
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-platforms
+  cancel-in-progress: false
+
+env:
+  PPA_TARGET: ppa:mastercrypt/uoo
+  AUR_PACKAGE: uoo-boot-manager-bin
+
+jobs:
+  verify:
+    name: Verify the published release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check the version, tag, and published state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Expected a stable release version such as 2.2.1.\n' >&2
+            exit 1
+          fi
+          state="$(gh release view "v$VERSION" --json isDraft,isPrerelease --jq '[.isDraft,.isPrerelease]|join(",")')"
+          if [[ "$state" != "false,false" ]]; then
+            printf 'Release v%s must be published and not a prerelease (draft,prerelease=%s).\n' "$VERSION" "$state" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          persist-credentials: false
+      - name: Confirm the tagged sources carry this version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(python3 scripts/package-version.py)" = "$VERSION"
+
+  ppa:
+    name: Launchpad PPA
+    if: inputs.ppa
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          persist-credentials: false
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts dpkg-dev debhelper dh-python dput gnupg lintian distro-info-data
+      - name: Require the changelog to match the release
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          head -n1 debian/changelog | grep -F "uoo-boot-manager ($VERSION-0ppa1~noble1) noble;"
+      - name: Build unsigned source packages for every supported Ubuntu release
+        run: |
+          python3 scripts/build-ppa-source.py --list-series
+          python3 scripts/build-ppa-source.py --all-supported --output dist/ppa
+          ls dist/ppa/*/*_source.changes
+      - name: Import the signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir "$GNUPGHOME"
+          printf '%s' "$GPG_PASSPHRASE" > "$RUNNER_TEMP/gpg-passphrase"
+          printf '%s' "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          printf 'GNUPGHOME=%s\n' "$GNUPGHOME" >> "$GITHUB_ENV"
+      - name: Sign and upload every suite
+        env:
+          GPG_FINGERPRINT: ${{ secrets.PPA_GPG_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          for changes in dist/ppa/*/*_source.changes; do
+            debsign -k"$GPG_FINGERPRINT" \
+              -p"gpg --batch --pinentry-mode loopback --passphrase-file $RUNNER_TEMP/gpg-passphrase" \
+              "$changes"
+            dput "$PPA_TARGET" "$changes"
+          done
+      - name: Remove the signing key
+        if: always()
+        run: rm -rf -- "$RUNNER_TEMP/gnupg" "$RUNNER_TEMP/gpg-passphrase"
+
+  snap:
+    name: Snap Store
+    if: inputs.snap
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 20
+    steps:
+      - name: Download and verify both Snaps from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir snaps
+          cd snaps
+          gh release download "v$VERSION" --pattern 'SHA256SUMS' --pattern '*.snap'
+          test "$(ls *.snap | wc -l)" -eq 2
+          sha256sum --check --ignore-missing SHA256SUMS
+      - name: Upload the amd64 Snap
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
+        with:
+          store_login: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          snap: snaps/uoo-boot-manager_${{ inputs.version }}_amd64.snap
+          release: ${{ inputs.snap_channel }}
+      - name: Upload the arm64 Snap
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1.2.0
+        with:
+          store_login: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          snap: snaps/uoo-boot-manager_${{ inputs.version }}_arm64.snap
+          release: ${{ inputs.snap_channel }}
+
+  winget:
+    name: WinGet pull request
+    if: inputs.winget
+    needs: verify
+    runs-on: windows-2025
+    environment: release
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          persist-credentials: false
+      - name: Generate manifests from the verified published installers
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python scripts/build-winget.py --version $env:VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest generation failed.' }
+      - name: Download the pinned WinGet Create client
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+          Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $target
+          if ((Get-FileHash $target -Algorithm SHA256).Hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') { throw 'WinGet Create hash mismatch.' }
+          "WINGETCREATE=$target" >> $env:GITHUB_ENV
+      - name: Submit the manifests
+        env:
+          VERSION: ${{ inputs.version }}
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = "packaging\winget\manifests\h\HaykJomardyan\UooBootManager\$env:VERSION"
+          & $env:WINGETCREATE submit --no-open --prtitle "HaykJomardyan.UooBootManager version $env:VERSION" $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet submission failed.' }
+
+  aur:
+    name: AUR package
+    if: inputs.aur
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          persist-credentials: false
+      - name: Download and verify the Debian package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir release
+          cd release
+          gh release download "v$VERSION" --pattern SHA256SUMS --pattern "uoo-boot-manager_${VERSION}_all.deb"
+          sha256sum --check --ignore-missing SHA256SUMS
+      - name: Render PKGBUILD and .SRCINFO
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python3 scripts/build-aur.py --version "$VERSION" --sha256sums release/SHA256SUMS --output aur
+      - name: Push to the AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          # Trust on first use; compare with https://aur.archlinux.org/ if in doubt.
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          git clone "ssh://aur@aur.archlinux.org/$AUR_PACKAGE.git" aur-repo
+          cp aur/PKGBUILD aur/.SRCINFO aur-repo/
+          cd aur-repo
+          git config user.name 'Hayk Jomardyan'
+          git config user.email 'jomardyan@outlook.com'
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            printf 'AUR already contains this release.\n'
+          else
+            git commit -m "Update to $VERSION"
+            git push origin HEAD:master
+          fi
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/aur

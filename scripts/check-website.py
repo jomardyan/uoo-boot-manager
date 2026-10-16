@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Check the static landing page's internal links and deployable asset tree."""
+"""Check the static landing page's internal links and deployable asset tree (directory or ZIP)."""
 
 import argparse
 from html.parser import HTMLParser
 import json
+import tempfile
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+import zipfile
 
 
 class Page(HTMLParser):
@@ -27,7 +29,22 @@ class Page(HTMLParser):
             raise ValueError("Images require alternative text or an empty decorative alt")
 
 
-def check(directory):
+def check(path):
+    path = path.resolve()
+    if path.is_file():
+        with tempfile.TemporaryDirectory() as extracted:
+            with zipfile.ZipFile(path) as archive:
+                if archive.testzip() is not None:
+                    raise ValueError("Corrupt entry in " + path.name)
+                archive.extractall(extracted)
+            check_directory(Path(extracted))
+            if not (Path(extracted) / ".nojekyll").is_file():
+                raise ValueError("Missing .nojekyll in " + path.name)
+    else:
+        check_directory(path)
+
+
+def check_directory(directory):
     directory = directory.resolve()
     parser = Page()
     parser.feed((directory / "index.html").read_text())
@@ -55,5 +72,5 @@ def check(directory):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("directory", nargs="?", type=Path, default=Path(__file__).resolve().parents[1] / "website/dist")
-    check(parser.parse_args().directory)
+    parser.add_argument("path", nargs="?", type=Path, default=Path(__file__).resolve().parents[1] / "website/dist/uoo-website.zip", help="website directory or ZIP archive")
+    check(parser.parse_args().path)

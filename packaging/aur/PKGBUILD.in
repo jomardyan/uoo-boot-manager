@@ -1,0 +1,22 @@
+# Maintainer: Hayk Jomardyan <jomardyan@outlook.com>
+pkgname=uoo-boot-manager-bin
+_pkgname=uoo-boot-manager
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Native GTK4 boot configuration desktop with an authenticated helper'
+arch=('any')
+url='https://github.com/jomardyan/uoo-boot-manager'
+license=('MIT')
+depends=('python>=3.10' 'python-gobject' 'gobject-introspection-runtime' 'gtk4>=4.6' 'libadwaita>=1.5' 'polkit')
+optdepends=('efibootmgr: UEFI inspection and configuration')
+provides=("$_pkgname=$pkgver")
+conflicts=("$_pkgname")
+options=('!strip' '!debug')
+noextract=("${_pkgname}_${pkgver}_all.deb")
+source=("${_pkgname}_${pkgver}_all.deb::$url/releases/download/v$pkgver/${_pkgname}_${pkgver}_all.deb")
+sha256sums=('@SHA256@')
+
+package() {
+    bsdtar -xf "${_pkgname}_${pkgver}_all.deb" data.tar.zst
+    bsdtar -xf data.tar.zst -C "$pkgdir" --no-same-owner
+}

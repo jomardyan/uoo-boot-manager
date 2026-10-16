@@ -1,0 +1,23 @@
+pkgbase = uoo-boot-manager-bin
+	pkgdesc = Native GTK4 boot configuration desktop with an authenticated helper
+	pkgver = @VERSION@
+	pkgrel = 1
+	url = https://github.com/jomardyan/uoo-boot-manager
+	arch = any
+	license = MIT
+	depends = python>=3.10
+	depends = python-gobject
+	depends = gobject-introspection-runtime
+	depends = gtk4>=4.6
+	depends = libadwaita>=1.5
+	depends = polkit
+	optdepends = efibootmgr: UEFI inspection and configuration
+	provides = uoo-boot-manager=@VERSION@
+	conflicts = uoo-boot-manager
+	options = !strip
+	options = !debug
+	noextract = uoo-boot-manager_@VERSION@_all.deb
+	source = uoo-boot-manager_@VERSION@_all.deb::https://github.com/jomardyan/uoo-boot-manager/releases/download/v@VERSION@/uoo-boot-manager_@VERSION@_all.deb
+	sha256sums = @SHA256@
+
+pkgname = uoo-boot-manager-bin

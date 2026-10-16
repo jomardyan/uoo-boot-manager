@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml/badge.svg?branch=main&amp;event=push" alt="Linux package build status on main"></a>
-  <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml/badge.svg?branch=main&amp;event=push" alt="Windows 11 package build status on main"></a>
+  <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml/badge.svg?branch=main&amp;event=workflow_dispatch" alt="Linux package build status on main"></a>
+  <a href="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml?query=branch%3Amain"><img src="https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml/badge.svg?branch=main&amp;event=workflow_dispatch" alt="Windows 11 package build status on main"></a>
   <a href="https://github.com/jomardyan/uoo-boot-manager/releases"><img src="https://img.shields.io/badge/version-2.2.1-E95420" alt="App version 2.2.1"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
@@ -32,9 +32,9 @@ system changes authenticate through the installed administrator helper.
 ## Downloads
 
 Choose a package from [GitHub Releases](https://github.com/jomardyan/uoo-boot-manager/releases).
-For development builds, open a successful [Linux](https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml)
+For development builds, run the [Linux](https://github.com/jomardyan/uoo-boot-manager/actions/workflows/verify.yml)
 or [Windows](https://github.com/jomardyan/uoo-boot-manager/actions/workflows/windows.yml)
-workflow run and download its **Artifacts**.
+workflow manually (**Run workflow**; no workflow runs automatically on a push) and download its **Artifacts**.
 
 | Platform or format | Packages | Architecture | Guide |
 | --- | --- | --- | --- |
@@ -89,6 +89,7 @@ Demo-mode screenshots of the Ubuntu and Windows editions. Click an image to view
 | UEFI firmware | Order, inclusion, activation, next boot, local EFI registrations | Order, inclusion, next boot, local EFI registrations |
 | Appearance | GRUB graphics mode, colors, validated PNG background | Native Windows light/dark desktop appearance |
 | Backups | Configuration snapshots, restoration, portable import/export | Private BCD/firmware backups, restoration, typed import/export |
+| Dual boot | Check and fix a hidden GRUB menu, Windows missing from GRUB, Ubuntu missing from or after Windows in UEFI | Check and fix a Linux loader that is unregistered or excluded in UEFI; optional Linux-first order |
 | Diagnostics and repair | Supported Ubuntu UEFI and BIOS bootloader repair | Supported repair of the running Windows installation's UEFI boot files |
 | Desktop experience | GTK4/libadwaita, keyboard navigation, demo mode | WPF Fluent, keyboard navigation, demo mode |
 
@@ -208,6 +209,31 @@ installed helper through UAC.
 > Details: [Microsoft's BitLocker recovery overview](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
 > and [Windows BitLocker handling in Uoo](docs/WINDOWS.md).
 
+### Dual-boot check and fix
+
+The **Dual boot** page checks how Ubuntu and Windows start and lists what it found. **Fix dual boot…**
+applies only the steps you leave selected, after a backup, and never restarts your computer. On Ubuntu a
+failed step restores the pre-fix backup; on Windows a failed step is rolled back and the remaining steps are skipped.
+
+| What it can fix | Ubuntu | Windows 11 |
+| --- | --- | --- |
+| Other system missing | Adds a managed GRUB entry for Windows Boot Manager, or turns on OS discovery; registers Ubuntu's loader in UEFI | Registers a Linux EFI loader found on the system partition |
+| Menu not shown | Shows the GRUB menu with a timeout | Not applicable |
+| Startup order | Puts Ubuntu's GRUB menu first and activates its entry | Adds an excluded Linux entry back; optionally starts the Linux menu first |
+
+It does not change BitLocker, LUKS, Secure Boot, partitions, or the clock, and it does not reinstall a bootloader
+(use **Repair** for that). Findings it cannot fix, such as a missing Ubuntu loader file, are explained instead.
+
+**Encrypted systems.** If a BitLocker volume is found, Uoo requires you to confirm that you have the recovery
+password, registers Ubuntu without changing the existing boot order, and leaves "start Ubuntu first" unselected:
+starting Windows through GRUB can change what the TPM measures and make BitLocker ask for the recovery key.
+LUKS volumes are reported with a reminder to keep a passphrase and header backup.
+
+The check also reports problems it cannot fix, with the likely cause and what to do: a read-only boot filesystem or UEFI
+variable store, a nearly full EFI System Partition, a later GRUB drop-in that overrides a setting, mixed BIOS/UEFI boot modes,
+full firmware storage, Windows Fast Startup, and Secure Boot certificate changes. Tool failures are explained in plain
+language. See the [troubleshooting guide](https://uoo.lolisoft.eu/docs/troubleshooting/).
+
 <details>
 <summary>Ubuntu configuration, supported operations, and repair limits</summary>
 
@@ -311,8 +337,8 @@ GDK_BACKEND=x11 GSK_RENDERER=cairo dbus-run-session -- xvfb-run -a python3 -m un
 The Linux workflow builds and checks Debian, RPM, Arch, AppImage, Flatpak, and
 Snap packages. The Windows workflow builds x64/ARM64 installers and ZIPs and
 runs model, native provider, live transaction, and desktop checks on disposable
-runners. A green build badge reports its workflow status; optional VM boot
-integration is a separate, opt-in Linux check.
+runners. All workflows are manual (**Actions → choose a workflow → Run workflow**), so a build badge shows
+only the status of the last run you started; optional VM boot integration is a separate, opt-in Linux check.
 
 For end-to-end Ubuntu boot validation, `scripts/vm-integration.py` uses a
 checksum-verified official image and an independent disposable QEMU overlay.
@@ -341,6 +367,7 @@ uploading to your own hosting.
 | [Validation report](docs/VALIDATION.md) | Recorded test evidence and remaining limits |
 | [Automated publishing](docs/PUBLISH-AUTOMATION.md) | Manual GitHub Actions workflow for the PPA, Snap Store, WinGet, and AUR |
 | [Windows code signing](docs/CODE-SIGNING.md) | Signing options and plan for removing SmartScreen warnings |
+| [Dual-boot troubleshooting](https://uoo.lolisoft.eu/docs/troubleshooting/) | The most common dual-boot problems, their causes, what Uoo fixes, and what you do yourself |
 | [Security policy](SECURITY.md) | Private vulnerability reporting and scope |
 | [Contributing](CONTRIBUTING.md) | Development setup, safety rules, and pull request checks |
 

@@ -1,17 +1,7 @@
 name: Validate WinGet package
 
+# Manual only: run it from Actions > Validate WinGet package > Run workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'packaging/winget/**'
-      - 'scripts/build-winget.py'
-      - '.github/workflows/winget.yml'
-  pull_request:
-    paths:
-      - 'packaging/winget/**'
-      - 'scripts/build-winget.py'
-      - '.github/workflows/winget.yml'
   workflow_dispatch:
 
 permissions:

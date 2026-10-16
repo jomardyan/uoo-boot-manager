@@ -7,6 +7,7 @@ import re
 import signal
 import subprocess
 
+from .advice import explain
 from .core import parse_entries, parse_firmware, parse_settings
 
 
@@ -36,6 +37,7 @@ class Paths:
     sys_block: Path = Path("/sys/class/block")
     mkrelpath: Path = Path("/usr/bin/grub-mkrelpath")
     bios_modules: Path = Path("/usr/lib/grub/i386-pc")
+    os_prober: Path = Path("/usr/bin/os-prober")
 
     @property
     def override(self):
@@ -77,7 +79,8 @@ def run_command(args, timeout=120):
         raise RuntimeError(f"Cannot run {Path(args[0]).name}: {exc}") from exc
     if process.returncode:
         details = (error or output).strip()[-4000:]
-        raise RuntimeError(f"{Path(args[0]).name} failed: {details or 'no details available'}")
+        hint = explain(Path(args[0]).name, details)
+        raise RuntimeError(f"{Path(args[0]).name} failed: {details or 'no details available'}" + (f"\n\nWhat this usually means: {hint}" if hint else ""))
     return output
 
 

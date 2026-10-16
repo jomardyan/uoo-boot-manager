@@ -14,6 +14,7 @@ These requirements cover the Ubuntu edition, which manages Ubuntu GRUB and UEFI 
 - Reorder firmware entries, manage inclusion in BootOrder, change active flags, and create/remove firmware loader entries with explicit confirmation and protection for the current boot path.
 - Create, inspect, export, remove, and restore backups; export/import validated portable GRUB/custom-entry configurations.
 - Diagnose boot prerequisites and provide guided UEFI and BIOS bootloader repair/reinstallation where the current installation supports it.
+- Check dual boot and apply a reviewed fix composed only of existing verified operations (GRUB menu and OS discovery, a managed Windows chainloader entry, Ubuntu firmware registration and order), requiring a recovery-key acknowledgement and a more conservative plan when BitLocker is present.
 - Provide a complete demo, keyboard navigation, responsive desktop layouts, progress, recoverable error messages, and confirmation of material changes.
 
 ## Reliability and trust
@@ -23,6 +24,7 @@ These requirements cover the Ubuntu edition, which manages Ubuntu GRUB and UEFI 
 - Serialize system writes, preserve unrelated settings, write atomically, save backups, and recover unfinished transactions.
 - Verify generated GRUB syntax and requested firmware state; report rollback failures and repair limitations accurately.
 - Detect conflicting GRUB drop-ins, stale selections, unsupported environment-block storage, and unavailable firmware.
+- Explain common tool failures in plain language (full firmware storage, read-only variable store or `/boot`, full EFI System Partition, live-session or chroot GRUB errors, authentication cancelled or unavailable), and report conditions that make a fix impossible instead of offering it.
 - Keep privileged backups private, validate their schema/integrity, and constrain imported data to supported configuration values.
 - Do not reboot or modify the host boot configuration during development verification.
 

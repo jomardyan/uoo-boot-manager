@@ -49,10 +49,10 @@ release must prove.
 4. Keep PRs focused; update the README or docs when behavior changes.
 5. Describe how you tested, and on which OS and boot mode (UEFI or BIOS).
 
-**Commit messages:** a commit on `main` whose first line starts with
-`release: v` or `publish: v` triggers the release workflows. Do not use those
-prefixes unless you are cutting a release. Maintainers may reword squash
-messages to avoid this.
+**Continuous integration:** GitHub Actions workflows do not run automatically on pushes or pull
+requests. Run the tests locally (`make test`), and maintainers start the **Linux** and **Windows**
+build workflows manually (**Actions → Run workflow**) when a change needs package or native
+verification.
 
 ## Reporting security issues
 

@@ -40,7 +40,7 @@
   </header>
 
   <main id="main" class="wrap doc-layout">
-    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/faq/" aria-current="page">FAQ</a></li></ul></nav>
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/troubleshooting/">Troubleshooting</a></li><li><a href="/docs/faq/" aria-current="page">FAQ</a></li></ul></nav>
     <article class="doc-content">
       <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>FAQ</span></p>
       <h1 class="doc-title">Frequently asked questions</h1>
@@ -54,6 +54,9 @@
 
       <h2 id="safe">Can a change leave my computer unable to start?</h2>
       <p>Any boot change carries risk. Uoo validates requests, backs up first, verifies the result, and rolls back when a tool fails. It cannot recover a failed disk or guarantee recovery from power loss in the middle of a change, so keep recovery media and, on encrypted systems, your <a href="/docs/encrypted-disks/">recovery key</a>.</p>
+
+      <h2 id="dual-boot-fix">What does "Fix dual boot" do?</h2>
+      <p>It checks how Ubuntu and Windows start and offers only the fixes Uoo can make safely: showing a hidden GRUB menu, adding Windows to GRUB, registering Ubuntu or another Linux loader in the UEFI firmware, and fixing the startup order. You choose each step, Uoo backs up first, and it never restarts your computer. It does not change encryption, Secure Boot, partitions, or the clock, and it cannot fix every dual-boot problem. See <a href="/docs/encrypted-disks/#uoo-fix">encrypted systems</a> for how it behaves with BitLocker.</p>
 
       <h2 id="distros">Which Linux distributions are supported?</h2>
       <p>Ubuntu 24.04+ is the verified GRUB backend. Fedora, openSUSE, and Arch packages provide the desktop, demo, and available inspection, but GRUB changes and repair are not established there. See <a href="/docs/ubuntu/">Uoo on Ubuntu</a>.</p>

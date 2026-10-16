@@ -190,7 +190,8 @@ public sealed class WindowsBootService : IBootService
             return new() { Revision = revision, RequiresAdministrator = !WindowsMachine.Administrator, Machine = Environment.MachineName, BitLockerProtectionEnabled = bitLocker.Protection == 1,
                 BitLockerStatusKnown = bitLocker.Protection is 0 or 1,
                 WindowsVersion = Environment.OSVersion.VersionString, Entries = entries, Menu = menu, Firmware = firmware,
-                Backups = saved, Diagnostics = WindowsMachine.Diagnostics(), Repair = WindowsMachine.RepairPlan(), Errors = errors };
+                Backups = saved, Diagnostics = WindowsMachine.Diagnostics(), Repair = WindowsMachine.RepairPlan(),
+                LinuxLoaders = WindowsMachine.Administrator ? WindowsMachine.LinuxLoaders() : [], DualBootFacts = WindowsMachine.ReadDualBootFacts(), Errors = errors };
         }
         catch (Exception error) when (error is ManagementException or InvalidOperationException or IOException or UnauthorizedAccessException or COMException or ArgumentException or OverflowException)
         {

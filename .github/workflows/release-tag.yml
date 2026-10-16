@@ -1,8 +1,13 @@
 name: Create requested release tag
 
+# Manual only: run it from Actions > Create requested release tag > Run workflow, on main.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to tag and publish; it must equal the Linux and Windows versions (for example 2.2.1)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -14,7 +19,7 @@ concurrency:
 jobs:
   tag:
     name: Create the requested release tag
-    if: "startsWith(github.event.head_commit.message, 'release: v')"
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -31,15 +36,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
           set -euo pipefail
           version="$(python3 scripts/package-version.py)"
           windows_version="$(python3 -c 'from xml.etree import ElementTree as E; print(E.parse("windows/Directory.Build.props").findtext(".//Version"))')"
-          requested="${HEAD_MESSAGE%%$'\n'*}"
-          if [[ "$windows_version" != "$version" || "$requested" != "release: v$version" ]]; then
-            printf 'Release request must match the Linux and Windows versions: release: v%s\n' "$version" >&2
+          if [[ "$windows_version" != "$version" || "$REQUESTED_VERSION" != "$version" ]]; then
+            printf 'The requested version (%s) must equal the Linux version (%s) and the Windows version (%s).\n' \
+              "$REQUESTED_VERSION" "$version" "$windows_version" >&2
             exit 1
           fi
           tag="v$version"

@@ -10,6 +10,7 @@ import re
 
 from .storage import Store, atomic_write, file_state, private_directory, read_regular, restore_file
 from .core import parse_entries, parse_settings
+from .dualboot import DualBoot
 from .features import Features
 from .firmware import Firmware
 from .repair import Repair
@@ -72,7 +73,7 @@ def revision(paths):
     return digest.hexdigest()
 
 
-class ProductionManager(Features, Firmware, Repair):
+class ProductionManager(Features, Firmware, Repair, DualBoot):
     def __init__(self, paths=None, runner=None):
         from .system import Paths, run_command
         self.paths = paths if paths is not None else Paths()
@@ -240,7 +241,7 @@ class ProductionManager(Features, Firmware, Repair):
             raise ValueError("Expected a JSON object.")
         action = request.get("action")
         fields = {
-            "snapshot": set(), "list_backups": set(), "repair_plan": set(), "refresh_grub": set(),
+            "snapshot": set(), "list_backups": set(), "repair_plan": set(), "refresh_grub": set(), "dual_boot_plan": set(),
             "clear_background": set(), "apply_grub": {"entry", "timeout", "style", "changes"},
             "apply_order": {"order"}, "next_boot": {"entry"}, "grub_next_boot": {"entry"},
             "custom_entries": {"entries"}, "set_active": {"entry", "active"},
@@ -248,6 +249,7 @@ class ProductionManager(Features, Firmware, Repair):
             "create_backup": {"kind"}, "restore": {"backup"}, "delete_backup": {"backup"},
             "backup_details": {"backup"}, "export_backup": {"backup"}, "import_configuration": {"data"},
             "apply_background": {"png"}, "repair": {"plan", "confirm"},
+            "dual_boot_fix": {"plan", "steps", "acknowledge_recovery"},
         }
         if not isinstance(action, str) or action not in fields:
             raise ValueError("Unsupported action.")
@@ -262,7 +264,8 @@ class ProductionManager(Features, Firmware, Repair):
             return {"ok": True, "snapshot": snapshot(self.paths, self.runner), "message": "Boot options reloaded."}
         if action == "list_backups":
             return {"ok": True, "backups": self.list_backups(), "message": "Backups loaded."}
-        reads = {"backup_details": self.backup_details, "export_backup": self.export_backup, "repair_plan": self.repair_plan}
+        reads = {"backup_details": self.backup_details, "export_backup": self.export_backup, "repair_plan": self.repair_plan,
+                 "dual_boot_plan": self.dual_boot_plan}
         if isinstance(action, str) and action in reads:
             return {"ok": True, **reads[action](request)}
         operations = {"apply_grub": self.apply_grub, "apply_order": self.apply_order, "next_boot": self.next_boot,
@@ -271,7 +274,7 @@ class ProductionManager(Features, Firmware, Repair):
                       "create_uefi": self.create_uefi, "delete_uefi": self.delete_uefi,
                       "create_backup": self.create_backup, "delete_backup": self.delete_backup,
                       "import_configuration": self.import_configuration, "apply_background": self.apply_background,
-                      "clear_background": self.clear_background, "repair": self.repair}
+                      "clear_background": self.clear_background, "repair": self.repair, "dual_boot_fix": self.dual_boot_fix}
         if not isinstance(action, str) or action not in operations:
             raise ValueError("Unsupported action.")
         with self.lock():

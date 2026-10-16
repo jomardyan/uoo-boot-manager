@@ -1,8 +1,7 @@
 name: Publish an existing verified release
 
+# Manual only: run it from Actions > Publish an existing verified release > Run workflow.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -20,7 +19,6 @@ concurrency:
 jobs:
   publish:
     name: Publish an existing verified release
-    if: "github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'publish: v')"
     runs-on: ubuntu-24.04
     timeout-minutes: 65
     permissions:
@@ -36,15 +34,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REQUESTED_VERSION: ${{ inputs.version }}
-          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         shell: bash
         run: |
           set -euo pipefail
           version="$REQUESTED_VERSION"
-          if [[ -z "$version" ]]; then
-            request="${HEAD_MESSAGE%%$'\n'*}"
-            version="${request#publish: v}"
-          fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             printf 'Expected an existing semantic release version.\n' >&2
             exit 1

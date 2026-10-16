@@ -415,5 +415,166 @@ await Test("JSON protocol accepts only exact operation names", () =>
         Check(JsonSerializer.Deserialize<BootRequest>(JsonSerializer.Serialize(new BootRequest { Operation = operation }, BootJson.Options), BootJson.Options)!.Operation == operation);
     return Task.CompletedTask;
 });
+await Test("dual boot: demo plan finds an unregistered loader and offers an optional reorder", async () =>
+{
+    var plan = DualBoot.Analyze(await Inspect(new DemoBootService()));
+    Check(plan.Supported && plan.Encrypted);
+    var register = plan.Steps.Single(x => x.Action == DualBootAction.RegisterLoader);
+    Check(register.Recommended && register.Title.Contains("Fedora") && register.Target == @"\EFI\fedora\shimx64.efi");
+    var first = plan.Steps.Single(x => x.Action == DualBootAction.StartFirst);
+    Check(!first.Recommended && first.Detail.Contains("BitLocker"));
+    Check(plan.Findings.Any(x => x.Id == "bitlocker" && x.Severity == "warning") && plan.Findings.Any(x => x.Id == "clock"));
+    Check(plan.Steps.All(x => x.Action != DualBootAction.RegisterLoader || !x.Target.Contains("ubuntu")), "A registered loader is not reported");
+});
+await Test("dual boot: registering a loader keeps the boot order and is verified", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var step = DualBoot.Analyze(before).Steps.Single(x => x.Action == DualBootAction.RegisterLoader);
+    var request = DualBoot.BuildRequest(step, before);
+    Check(request.Operation == BootOperation.AddFirmwareEntry && request.Description == "Fedora" && request.EfiLoaderPath == step.Target);
+    var after = await Apply(service, request);
+    Check(after.Firmware.Order.Take(before.Firmware.Order.Count).SequenceEqual(before.Firmware.Order), "Existing order is unchanged");
+    Check(after.Firmware.Entries.Any(x => x.Description == "Fedora" && x.Path == step.Target));
+    Check(DualBoot.Analyze(after).Steps.All(x => x.Action != DualBootAction.RegisterLoader), "The loader is no longer reported");
+    Check(after.Backups.Count == 1, "A backup was created automatically");
+});
+await Test("dual boot: starting Linux first moves only that entry", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var step = DualBoot.Analyze(before).Steps.Single(x => x.Action == DualBootAction.StartFirst);
+    var after = await Apply(service, DualBoot.BuildRequest(step, before));
+    Check(after.Firmware.Order[0] == DemoBootService.FirmwareUbuntuId && after.Firmware.Order[1] == DemoBootService.FirmwareWindowsId);
+    Check(DualBoot.Analyze(after).Steps.All(x => x.Action != DualBootAction.StartFirst));
+});
+await Test("dual boot: an excluded Linux entry is appended back without reordering others", async () =>
+{
+    var service = new DemoBootService(); var before = await Inspect(service);
+    var excluded = await Apply(service, new() { Operation = BootOperation.SetFirmwareOrder, Order = [DemoBootService.FirmwareWindowsId] });
+    var plan = DualBoot.Analyze(excluded);
+    var include = plan.Steps.Single(x => x.Action == DualBootAction.IncludeInOrder);
+    Check(include.Recommended && plan.Findings.Any(x => x.Id == "linux_excluded"));
+    var after = await Apply(service, DualBoot.BuildRequest(include, excluded));
+    Check(after.Firmware.Order.SequenceEqual([DemoBootService.FirmwareWindowsId, DemoBootService.FirmwareUbuntuId]));
+});
+await Test("dual boot: the recommended steps converge to a clean plan the way the desktop applies them", async () =>
+{
+    var service = new DemoBootService(); var snapshot = await Inspect(service);
+    foreach (var chosen in DualBoot.Analyze(snapshot).Steps.Where(x => x.Recommended).ToList())
+    {
+        var step = DualBoot.Analyze(snapshot).Steps.FirstOrDefault(x => x.Id == chosen.Id);
+        if (step is null) continue;
+        snapshot = await Apply(service, DualBoot.BuildRequest(step, snapshot));
+    }
+    Check(DualBoot.Analyze(snapshot).Steps.All(x => !x.Recommended), "No recommended step remains");
+});
+await Test("dual boot: unsupported without administrator access or UEFI", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var admin = DualBoot.Analyze(snapshot with { RequiresAdministrator = true });
+    Check(!admin.Supported && admin.Reason.Contains("administrator") && admin.Steps.Count == 0);
+    var bios = DualBoot.Analyze(snapshot with { Firmware = new() { Available = false, Reason = "Legacy BIOS." } });
+    Check(!bios.Supported && bios.Reason == "Legacy BIOS." && bios.Steps.Count == 0);
+});
+await Test("dual boot: no Linux evidence produces information only", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var windowsOnly = snapshot with { LinuxLoaders = [], Firmware = snapshot.Firmware with { Entries = snapshot.Firmware.Entries.Where(x => x.IsWindowsBootManager).ToList(), Order = [DemoBootService.FirmwareWindowsId] } };
+    var plan = DualBoot.Analyze(windowsOnly);
+    Check(plan.Supported && plan.Steps.Count == 0 && plan.Findings.Single().Id == "no_linux");
+});
+await Test("dual boot: steps are rebuilt from the current snapshot and refuse stale targets", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var plan = DualBoot.Analyze(snapshot);
+    var register = plan.Steps.Single(x => x.Action == DualBootAction.RegisterLoader);
+    bool refused = false;
+    try { DualBoot.BuildRequest(register, snapshot with { LinuxLoaders = [] }); } catch (ArgumentException) { refused = true; }
+    Check(refused, "A vanished loader was accepted");
+    refused = false;
+    var first = plan.Steps.Single(x => x.Action == DualBootAction.StartFirst);
+    try { DualBoot.BuildRequest(first, snapshot with { Firmware = snapshot.Firmware with { Entries = snapshot.Firmware.Entries.Where(x => x.IsWindowsBootManager).ToList() } }); } catch (ArgumentException) { refused = true; }
+    Check(refused, "A vanished firmware entry was accepted");
+});
+await Test("dual boot: loader names map only to known Linux directories", () =>
+{
+    Check(LinuxDistributions.Identify(@"\EFI\ubuntu\shimx64.efi") == "Ubuntu" && LinuxDistributions.Identify(@"\efi\FEDORA\grubx64.efi") == "Fedora");
+    foreach (var path in new[] { @"\EFI\Microsoft\Boot\bootmgfw.efi", @"\EFI\ubuntu", @"\EFI\unknown\loader.efi", "", @"\ubuntu\shimx64.efi" })
+        Check(LinuxDistributions.Identify(path) is null, "Identified " + path);
+    return Task.CompletedTask;
+});
+await Test("dual boot: snapshot JSON round-trips Linux loaders and older snapshots still parse", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var json = JsonSerializer.Serialize(snapshot, BootJson.Options);
+    Check(JsonSerializer.Deserialize<BootSnapshot>(json, BootJson.Options)!.LinuxLoaders.Count == snapshot.LinuxLoaders.Count);
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject(); legacy.Remove("linuxLoaders");
+    Check(JsonSerializer.Deserialize<BootSnapshot>(legacy.ToJsonString(), BootJson.Options)!.LinuxLoaders.Count == 0);
+    return;
+});
+await Test("dual boot: Fast Startup, clock and Secure Boot facts drive specific findings", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var plan = DualBoot.Analyze(snapshot);
+    Check(plan.Findings.Single(x => x.Id == "fast_startup").Severity == "warning" && plan.Findings.Single(x => x.Id == "fast_startup").Detail.Contains("powercfg /h off"));
+    Check(plan.Findings.Any(x => x.Id == "clock" && x.Detail.Contains("RealTimeIsUniversal")) && plan.Findings.Any(x => x.Id == "secure_boot_keys" && x.Detail.Contains("SBAT")));
+    var settled = DualBoot.Analyze(snapshot with { DualBootFacts = new() { FastStartupEnabled = false, ClockIsUtc = true, SecureBootEnabled = false } });
+    Check(settled.Findings.All(x => x.Id is not ("fast_startup" or "clock" or "secure_boot_keys")), "Settled systems get no tips");
+    var unknown = DualBoot.Analyze(snapshot with { DualBootFacts = new() });
+    Check(unknown.Findings.Single(x => x.Id == "fast_startup").Severity == "info", "An unreadable setting is information, not an accusation");
+});
+await Test("dual boot: a nearly full ESP is reported and a roomy one is not", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var low = DualBoot.Analyze(snapshot with { DualBootFacts = snapshot.DualBootFacts with { Esps = [new(@"\\?\Volume{be85a039-98b2-451b-a37f-aa7a87160bb8}\", 3L * 1024 * 1024, 100L * 1024 * 1024)] } });
+    var finding = low.Findings.Single(x => x.Id == "esp_nearly_full");
+    Check(finding.Severity == "warning" && finding.Detail.Contains("3 MiB") && finding.Detail.Contains("does not resize"));
+    Check(DualBoot.Analyze(snapshot).Findings.All(x => x.Id != "esp_nearly_full"));
+    var negative = DualBoot.Analyze(snapshot with { DualBootFacts = snapshot.DualBootFacts with { Esps = [new("x", -5, 10)] } });
+    Check(negative.Findings.Single(x => x.Id == "esp_nearly_full").Detail.Contains("0 MiB"), "A bogus reading cannot print a negative size");
+});
+await Test("dual boot: an unverifiable ESP explains why Linux loaders were not scanned", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var plan = DualBoot.Analyze(snapshot with { LinuxLoaders = [], DualBootFacts = new(), Repair = new() { Available = false, Reason = "Exactly one verified writable local system ESP is required." } });
+    Check(plan.Supported && plan.Findings.Any(x => x.Id == "esp_unverified" && x.Detail.Contains("Exactly one")));
+    Check(DualBoot.Analyze(snapshot).Findings.All(x => x.Id != "esp_unverified"));
+});
+await Test("dual boot: facts and legacy snapshots round-trip through JSON", async () =>
+{
+    var snapshot = await Inspect(new DemoBootService());
+    var json = JsonSerializer.Serialize(snapshot, BootJson.Options);
+    var copy = JsonSerializer.Deserialize<BootSnapshot>(json, BootJson.Options)!;
+    Check(copy.DualBootFacts.FastStartupEnabled == true && copy.DualBootFacts.Esps.Count == 1);
+    var unknown = JsonSerializer.Deserialize<BootSnapshot>(JsonSerializer.Serialize(snapshot with { DualBootFacts = new() }, BootJson.Options), BootJson.Options)!;
+    Check(unknown.DualBootFacts.FastStartupEnabled is null && unknown.DualBootFacts.ClockIsUtc is null);
+    var legacy = System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject(); legacy.Remove("dualBootFacts");
+    Check(JsonSerializer.Deserialize<BootSnapshot>(legacy.ToJsonString(), BootJson.Options)!.DualBootFacts.Esps.Count == 0);
+    return;
+});
+await Test("friendly errors explain common Windows boot failures", () =>
+{
+    var cases = new (string Message, string Expected)[]
+    {
+        ("Access is denied.", "administrator"), ("0x80070005", "administrator"), ("There is not enough space on the disk.", "EFI System Partition"),
+        ("The process cannot access the file because it is being used by another process.", "antivirus"),
+        ("Could not find a part of the path '\\\\?\\Volume{x}\\EFI'.", "Disk Management"), ("The RPC server is unavailable.", "winmgmt"),
+        ("BCDBoot timed out; boot files will be restored.", "took too long"), ("Hibernation/Fast Startup prevents this operation.", "powercfg /h off"),
+        ("This Windows installation uses legacy BIOS.", "UEFI mode")
+    };
+    foreach (var (message, expected) in cases)
+        Check(FriendlyErrors.Advice(message).Contains(expected), "No advice for " + message);
+    Check(FriendlyErrors.Advice("Something unrelated happened.") == "" && FriendlyErrors.Advice(null) == "" && FriendlyErrors.Advice("  ") == "");
+    return Task.CompletedTask;
+});
+await Test("friendly errors keep the original message first and never repeat themselves", () =>
+{
+    var once = FriendlyErrors.Append("Access is denied.");
+    Check(once.StartsWith("Access is denied.\n\nWhat this usually means: ") && FriendlyErrors.Append(once) == once);
+    Check(FriendlyErrors.Append("Nothing known") == "Nothing known" && FriendlyErrors.Append(null) == "");
+    foreach (var rule in new[] { "Access is denied", "disk is full", "sharing violation", "system cannot find", "WMI", "timeout", "Fast Startup", "legacy BIOS" })
+        foreach (var banned in new[] { "format ", "diskpart", "clean ", "del ", "bcdedit /delete", "ntfsfix" })
+            Check(!FriendlyErrors.Advice(rule).Contains(banned, StringComparison.OrdinalIgnoreCase), "Risky advice for " + rule);
+    return Task.CompletedTask;
+});
 Console.WriteLine($"{passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;

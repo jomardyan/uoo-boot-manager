@@ -1,10 +1,7 @@
 name: Build Linux packages
 
+# Manual only: run it from Actions > Build Linux packages > Run workflow, on a branch or a v* tag.
 on:
-  push:
-    branches: ['**']
-    tags: ['v*']
-  pull_request:
   workflow_dispatch:
     inputs:
       run_vm:

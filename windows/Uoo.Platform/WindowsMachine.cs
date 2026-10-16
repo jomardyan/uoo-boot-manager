@@ -26,6 +26,9 @@ internal static class WindowsMachine
     private static extern bool SetVolumeMountPoint(string mount, string volume);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool DeleteVolumeMountPoint(string mount);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetDiskFreeSpaceEx(string directoryName, out ulong freeBytesAvailable, out ulong totalBytes, out ulong totalFreeBytes);
     [DllImport("kernel32.dll", EntryPoint = "GetVolumeInformationW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetVolumeInformation(string rootPath, StringBuilder? volumeName, uint volumeNameSize,
@@ -106,6 +109,59 @@ internal static class WindowsMachine
                 Convert.ToUInt32(item["PartitionNumber"]), Convert.ToBoolean(item["IsSystem"]), Guid.Parse((string)item["Guid"]).ToString("B")));
         }
         return result;
+    }
+
+    private static object? RegistryValue(string key, string name)
+    {
+        try { return Registry.GetValue(key, name, null); }
+        catch (Exception error) when (error is System.Security.SecurityException or IOException or UnauthorizedAccessException) { return null; }
+    }
+    private static bool? Dword(object? value) => value switch { int number => number != 0, long number => number != 0, _ => null };
+
+    /// <summary>Read-only facts behind common dual-boot problems; anything unreadable is reported as unknown.</summary>
+    public static DualBootFacts ReadDualBootFacts()
+    {
+        const string power = @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power";
+        var hiberboot = Dword(RegistryValue(power, "HiberbootEnabled"));
+        var hibernate = Dword(RegistryValue(power, "HibernateEnabled"));
+        List<EspSpace> esps = [];
+        if (Administrator)
+        {
+            try
+            {
+                foreach (var esp in Partitions())
+                    if (GetDiskFreeSpaceEx(esp.Volume, out var available, out var total, out _))
+                        esps.Add(new(esp.Volume, (long)Math.Min(available, long.MaxValue), (long)Math.Min(total, long.MaxValue)));
+            }
+            catch (Exception error) when (error is ManagementException or IOException or UnauthorizedAccessException or COMException) { /* Space is simply unknown. */ }
+        }
+        return new()
+        {
+            FastStartupEnabled = hiberboot is null || hibernate is null ? null : hiberboot == true && hibernate == true,
+            // Windows keeps local time unless RealTimeIsUniversal is set, so a missing value means local time.
+            ClockIsUtc = Dword(RegistryValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation", "RealTimeIsUniversal")) ?? false,
+            SecureBootEnabled = Dword(RegistryValue(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecureBoot\State", "UEFISecureBootEnabled")),
+            Esps = esps
+        };
+    }
+
+    /// <summary>Read-only scan of verified local ESPs for well-known Linux loaders. Failures yield an empty list.</summary>
+    public static List<LinuxLoader> LinuxLoaders()
+    {
+        List<LinuxLoader> found = [];
+        try
+        {
+            foreach (var esp in Partitions())
+                foreach (var (directory, name, files) in LinuxDistributions.Known)
+                    foreach (var file in files)
+                    {
+                        var loader = @"\EFI\" + directory + "\\" + file;
+                        try { EfiPath(esp, loader); found.Add(new(name, esp.Volume, loader)); break; }
+                        catch (Exception error) when (error is ArgumentException or IOException or UnauthorizedAccessException) { /* Not present or not a valid loader. */ }
+                    }
+        }
+        catch (Exception error) when (error is ManagementException or IOException or UnauthorizedAccessException or COMException) { /* Report no loaders rather than a partial scan. */ }
+        return found;
     }
 
     public static EspPartition ValidateEsp(string path, bool system = false)

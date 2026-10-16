@@ -21,6 +21,7 @@ public partial class MainWindow
         page.Children.Add(Ui.Card("Boot configuration", summary));
         var quick = Ui.WrapActions();
         quick.Children.Add(Ui.Button("Manage Windows boot", () => Navigate("Windows boot"), true));
+        quick.Children.Add(Ui.Button("Check dual boot", () => Navigate("Dual boot")));
         quick.Children.Add(Ui.Button("View diagnostics", () => Navigate("Diagnostics")));
         quick.Children.Add(Ui.Button("Backups and recovery", () => Navigate("Backups")));
         page.Children.Add(Ui.Card("Get started", quick));
@@ -182,6 +183,47 @@ public partial class MainWindow
         }
         firmwarePicker.SelectionChanged += (_, _) => Update(); Update();
         var manageCard = Ui.Card("Registered EFI entries", Ui.Text("Choose any registered loader, including entries excluded from the saved boot order. Including or excluding an entry takes effect after Apply firmware order. Windows Boot Manager is protected from deletion."), firmwarePicker, detail, manage); manageCard.IsEnabled = firmware.Available; page.Children.Add(manageCard); page.Children.Add(onceCard);
+        return Ui.Scroll(page);
+    }
+
+    private FrameworkElement BuildDualBoot()
+    {
+        var plan = DualBoot.Analyze(Snapshot);
+        dualChoices.Clear();
+        var page = Ui.Page("Dual boot", "Check how Windows and Linux start, then apply the fixes Uoo can make safely. You choose each step; Uoo backs up first and never restarts this PC.");
+        var actions = Ui.WrapActions(); actions.Children.Add(Ui.Button("Check again", async () => await RefreshAsync()));
+        if (!plan.Supported)
+        {
+            page.Children.Add(Ui.Card("Dual-boot check unavailable", Ui.Text(plan.Reason.Length > 0 ? plan.Reason : "A complete check is not available."), actions));
+            return Ui.Scroll(page);
+        }
+        if (!plan.Findings.Any(f => f.Severity is "problem" or "warning"))
+            page.Children.Add(Ui.Card("No dual-boot problems found", Ui.Text("Uoo found nothing it needs to fix. The information below may still help.")));
+        foreach (var finding in plan.Findings)
+        {
+            var label = finding.Severity switch { "problem" => "Problem", "warning" => "Review", _ => "Information" };
+            page.Children.Add(Ui.Card(finding.Title, Ui.Text(label, 12, true, new Thickness(0, 0, 0, 6)), Ui.Text(finding.Detail)));
+        }
+        var fix = Ui.Button("Fix dual boot…", async () => await FixDualBootAsync(), true);
+        if (plan.Steps.Count > 0)
+        {
+            var list = new StackPanel();
+            void UpdateFix() => fix.IsEnabled = dualChoices.Values.Any(selected => selected);
+            foreach (var step in plan.Steps)
+            {
+                dualChoices[step.Id] = step.Recommended;
+                var box = new CheckBox { Content = step.Title, IsChecked = step.Recommended, Margin = new Thickness(0, 8, 0, 2) };
+                Ui.Name(box, step.Title);
+                box.Checked += (_, _) => { dualChoices[step.Id] = true; UpdateFix(); };
+                box.Unchecked += (_, _) => { dualChoices[step.Id] = false; UpdateFix(); };
+                list.Children.Add(box); list.Children.Add(Ui.Text(step.Detail, 12, margin: new Thickness(28, 0, 0, 8)));
+            }
+            UpdateFix();
+            actions.Children.Add(fix);
+            page.Children.Add(Ui.Card("Fixes Uoo can apply", list, Ui.Text(plan.Encrypted ? "BitLocker is on. Uoo asks you to confirm that you have the recovery key, and never changes encryption." : "Selected steps run in order after a backup."), actions));
+        }
+        else
+            page.Children.Add(Ui.Card("", actions));
         return Ui.Scroll(page);
     }
 

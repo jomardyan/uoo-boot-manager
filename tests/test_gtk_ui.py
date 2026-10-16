@@ -77,7 +77,7 @@ class NativeDesktopTests(unittest.TestCase):
 
     def test_native_window_sidebar_and_small_layout(self):
         self.assertIsInstance(self.window, Adw.ApplicationWindow)
-        self.assertEqual(len(self.window.pages), 8)
+        self.assertEqual(len(self.window.pages), 9)
         self.window.set_default_size(900, 640)
         self.pump(0.2)
         for key, page in self.window.pages.items():
@@ -380,6 +380,64 @@ class NativeDesktopTests(unittest.TestCase):
         dialog.close()
         self.assert_no_errors()
 
+    def break_demo_dual_boot(self):
+        self.window.dispatch({"action": "apply_grub", "changes": {"GRUB_TIMEOUT_STYLE": "hidden", "GRUB_TIMEOUT": 0}})
+        self.window.dispatch({"action": "apply_order", "order": ["0001", "0000", "0002"]})
+
+    def test_dual_boot_check_lists_findings_and_selectable_steps(self):
+        self.window.navigate("dualboot")
+        self.assertFalse(self.window.buttons["dualboot_fix"].get_sensitive())
+        self.window.inspect_dual_boot()
+        self.assertEqual(self.window.dual_plan["steps"], [])
+        self.assertFalse(self.window.buttons["dualboot_fix"].get_sensitive())
+        self.break_demo_dual_boot()
+        self.window.inspect_dual_boot()
+        plan = self.window.dual_plan
+        self.assertEqual([step["id"] for step in plan["steps"]], ["grub_menu", "uefi_order"])
+        self.assertTrue(plan["requires_acknowledgement"])
+        self.assertEqual(len(self.window.dual_step_rows), 2)
+        self.assertTrue(self.window.buttons["dualboot_fix"].get_sensitive())
+        # The BitLocker-sensitive reordering is not preselected; deselecting every step disables the fix.
+        self.assertEqual(self.window._dual_selected(), ["grub_menu"])
+        self.window.dual_step_rows[0].set_active(False)
+        self.assertFalse(self.window.buttons["dualboot_fix"].get_sensitive())
+        self.window.dual_step_rows[1].set_active(True)
+        self.assertTrue(self.window.buttons["dualboot_fix"].get_sensitive())
+        self.assert_no_errors()
+
+    def test_dual_boot_fix_applies_selected_steps_and_clears_the_plan(self):
+        self.break_demo_dual_boot()
+        self.window.inspect_dual_boot()
+        self.window.dual_step_rows[1].set_active(True)
+        self.window.execute_dual_boot_fix()
+        self.pump()
+        self.assertEqual(self.window.snapshot["settings"]["GRUB_TIMEOUT_STYLE"], "menu")
+        self.assertEqual(self.window.snapshot["firmware"]["order"][0], "0000")
+        self.assertIsNone(self.window.dual_plan)
+        self.assertEqual(self.window.backups[0]["kind"], "all")
+        self.window.inspect_dual_boot()
+        self.assertEqual(self.window.dual_plan["steps"], [])
+        self.assert_no_errors()
+
+    def test_native_dual_boot_dialog_requires_the_recovery_key_acknowledgement(self):
+        self.break_demo_dual_boot()
+        self.window.inspect_dual_boot()
+        self.window.confirm_handler = None
+        self.window.execute_dual_boot_fix()
+        dialog = self.window.last_dialog
+        check = dialog.get_extra_child()
+        self.assertIsInstance(check, Gtk.CheckButton)
+        self.assertFalse(dialog.get_response_enabled("apply"))
+        dialog.emit("response", "apply")
+        self.assertEqual(self.window.snapshot["settings"]["GRUB_TIMEOUT_STYLE"], "hidden")
+        check.set_active(True)
+        self.assertTrue(dialog.get_response_enabled("apply"))
+        dialog.emit("response", "apply")
+        dialog.close()
+        self.pump()
+        self.assertEqual(self.window.snapshot["settings"]["GRUB_TIMEOUT_STYLE"], "menu")
+        self.assert_no_errors()
+
     def test_cancelled_authentication_keeps_drafts_and_reenables_controls(self):
         self.window.demo = False
         self.window.snapshot["demo"] = False
@@ -415,6 +473,24 @@ class NativeDesktopTests(unittest.TestCase):
         args, kwargs = called.call_args
         self.assertEqual(args[0], ["/usr/bin/pkexec", "/usr/bin/uoo-boot-helper", "--stdin"])
         self.assertGreater(len(kwargs["input"]), 200000)
+
+    def test_helper_failures_are_explained_in_plain_language(self):
+        def failing(returncode, stdout="", stderr=""):
+            return subprocess.CompletedProcess([], returncode, stdout=stdout, stderr=stderr)
+        cases = [
+            (dict(return_value=failing(126)), "cancelled or you are not authorized"),
+            (dict(return_value=failing(127)), "no polkit agent"),
+            (dict(return_value=failing(1, stdout="", stderr="")), "no valid response"),
+            (dict(return_value=failing(1, stdout="not json", stderr="pkexec: boom")), "pkexec: boom"),
+            (dict(return_value=failing(1, stdout='{"ok": false, "error": "efibootmgr failed: No space"}')), "efibootmgr failed: No space"),
+            (dict(side_effect=subprocess.TimeoutExpired(["pkexec"], 600)), "10 minutes"),
+            (dict(side_effect=FileNotFoundError("pkexec")), "pkexec is not installed"),
+            (dict(side_effect=PermissionError("denied")), "could not be started"),
+        ]
+        for options, expected in cases:
+            with self.subTest(expected=expected), patch("uoo.gtk_app.subprocess.run", **options):
+                with self.assertRaisesRegex(RuntimeError, expected):
+                    run_helper({"action": "snapshot"})
 
     def test_flatpak_authentication_uses_the_host_fixed_helper(self):
         response = subprocess.CompletedProcess([], 0, stdout='{"ok": true}', stderr="")

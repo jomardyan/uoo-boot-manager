@@ -43,7 +43,7 @@ Rotate the Snap credentials before their expiry date.
 
 ## Running a release
 
-1. Publish the GitHub release (existing `release: vX.Y.Z` flow).
+1. Publish the GitHub release (run **Create requested release tag** with the version; see [PACKAGING.md](PACKAGING.md)).
 2. Run the workflow with that version and the platforms you want.
 3. Approve the `release` environment prompt.
 4. Check each platform's page (Launchpad builds, Snap revisions, the WinGet PR,

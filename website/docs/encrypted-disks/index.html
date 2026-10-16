@@ -40,7 +40,7 @@
   </header>
 
   <main id="main" class="wrap doc-layout">
-    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/" aria-current="page">Encrypted disks</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/" aria-current="page">Encrypted disks</a></li><li><a href="/docs/troubleshooting/">Troubleshooting</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
     <article class="doc-content">
       <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Encrypted disks</span></p>
       <h1 class="doc-title">BitLocker and encrypted disks</h1>
@@ -72,6 +72,16 @@
 
       <h2 id="dual-boot">Dual boot</h2>
       <p>Avoid changing the Secure Boot state or the firmware boot order while BitLocker is active unless you suspend it first. Reports from dual-boot users show that a changed boot chain can also prompt for the key on some systems; this is community experience, not a guarantee in either direction.</p>
+
+      <h2 id="uoo-fix">Uoo's dual-boot fix on encrypted systems</h2>
+      <p>The <strong>Dual boot</strong> page never changes BitLocker, LUKS, Secure Boot, or partitions. When it finds a BitLocker volume it becomes more cautious:</p>
+      <ul>
+        <li>You must confirm that you have the recovery password before any step runs.</li>
+        <li>Registering Ubuntu in the firmware keeps the existing boot order instead of placing Ubuntu first.</li>
+        <li>"Put Ubuntu's GRUB menu first" is left unselected. Starting Windows through GRUB can change what the TPM measures, so BitLocker may ask for the recovery key at every start.</li>
+        <li>LUKS volumes are reported with a reminder to keep a passphrase and a header backup.</li>
+      </ul>
+      <p>Uoo cannot predict whether a given change will trigger a BitLocker prompt, so the safest plan is still to suspend protection for the change, as described above.</p>
 
       <h2 id="sources">Sources</h2>
       <ul>

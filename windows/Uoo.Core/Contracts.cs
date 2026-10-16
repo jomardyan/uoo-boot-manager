@@ -85,6 +85,18 @@ public sealed record RepairPlan
     public string Confirmation { get; init; } = "REPAIR";
 }
 
+/// <summary>Free space on a verified local EFI System Partition.</summary>
+public sealed record EspSpace(string Partition, long FreeBytes, long TotalBytes);
+
+/// <summary>Windows settings that commonly cause dual-boot trouble. A null value means it could not be read.</summary>
+public sealed record DualBootFacts
+{
+    public bool? FastStartupEnabled { get; init; }
+    public bool? ClockIsUtc { get; init; }
+    public bool? SecureBootEnabled { get; init; }
+    public List<EspSpace> Esps { get; init; } = [];
+}
+
 public sealed record BootSnapshot
 {
     public bool Demo { get; init; }
@@ -100,6 +112,8 @@ public sealed record BootSnapshot
     public List<BackupInfo> Backups { get; init; } = [];
     public List<DiagnosticItem> Diagnostics { get; init; } = [];
     public RepairPlan Repair { get; init; } = new();
+    public List<LinuxLoader> LinuxLoaders { get; init; } = [];
+    public DualBootFacts DualBootFacts { get; init; } = new();
     public List<string> Errors { get; init; } = [];
 }
 

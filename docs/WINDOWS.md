@@ -48,6 +48,7 @@ the live boot provider.
 | Entry options | Safe mode, alternate command shell, boot log, driver names, base video, recovery, graphical or legacy Windows boot menu |
 | Firmware | UEFI order and explicit inclusion/exclusion, one-time selection, registration of an existing local EFI loader, removal of restorable local registrations |
 | Backups | Manual and automatic private BCD/firmware backups, integrity inspection, restore, delete, typed configuration import/export |
+| Dual boot | Detects Linux EFI loaders on the verified system partition, registers an unregistered loader in UEFI, adds an excluded Linux entry back, and can optionally start the Linux menu first |
 | Diagnostics | Running Windows loader, administrator access, boot mode, Secure Boot, BitLocker, and repair prerequisites |
 | Repair | Rebuild the running Windows installation's UEFI boot files with BCDBoot on a verified local GPT/FAT32 system ESP |
 
@@ -73,6 +74,13 @@ Uoo reports BitLocker protection before boot changes and requires an explicit
 recovery-key acknowledgment when protection is on or its state cannot be read.
 It does not suspend encryption, disable Secure Boot, enable test signing, or
 reboot automatically.
+
+The **Dual boot** page needs administrator access and UEFI. Every step it offers is an existing, validated
+operation (add a firmware entry or set the firmware order), applied one at a time after an automatic backup;
+Windows asks for approval for each step, and a failed step is rolled back and stops the sequence. New firmware
+entries are added after the existing ones, so the boot order does not change. "Start Linux first" is never
+selected by default, and when BitLocker is on the page explains that starting Windows through the Linux menu can
+make BitLocker ask for the recovery key. Uoo never suspends or changes BitLocker, Secure Boot, the clock, or Fast Startup. The page also reads (never changes) whether Fast Startup is on, whether the hardware clock is UTC, whether Secure Boot is on, and how much room the EFI System Partition has, and explains what each means for a dual-boot system. Error messages from Windows, WMI, and BCD operations are followed by a plain-language explanation of the likely cause.
 
 UEFI repair uses the currently running Windows directory and an explicitly
 verified system ESP. It backs up BCD plus the Microsoft/fallback EFI files it

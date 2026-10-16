@@ -138,6 +138,12 @@ public partial class MainWindow
             Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.ImportConfiguration, FilePath = path }, "Import", "Import sample configuration", "IMPORT"), "Import validated demo configuration");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
+        Navigate("Dual boot");
+        var dual = DualBoot.Analyze(Snapshot);
+        Check(dual.Supported && dual.Steps.Any(x => x.Action == DualBootAction.RegisterLoader), "Dual-boot check finds an unregistered Linux loader");
+        foreach (var key in dualChoices.Keys.ToList()) dualChoices[key] = key.StartsWith("register:", StringComparison.Ordinal);
+        Check(await FixDualBootAsync(), "Apply the reviewed dual-boot fix");
+        Check(DualBoot.Analyze(Snapshot).Steps.All(x => x.Action != DualBootAction.RegisterLoader), "The registered Linux loader is no longer reported");
         Check(await RunMutationAsync(new BootRequest { Operation = BootOperation.Repair, Confirmation = Snapshot.Repair.Confirmation }, "Repair", "Run demo repair plan", Snapshot.Repair.Confirmation), "Execute simulated repair plan"); Navigate("Overview");
     }
 }

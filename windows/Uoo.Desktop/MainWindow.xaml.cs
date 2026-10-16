@@ -11,8 +11,8 @@ namespace Uoo.Desktop;
 
 public sealed partial class MainWindow : Window
 {
-    internal static readonly string[] PageNames = ["Overview", "Windows boot", "Entry options", "Firmware", "Backups", "Diagnostics", "Repair"];
-    private static readonly string[] PageIcons = ["\uE80F", "\uE7F4", "\uE713", "\uE950", "\uE8F1", "\uE9D9", "\uE90F"];
+    internal static readonly string[] PageNames = ["Overview", "Windows boot", "Entry options", "Firmware", "Dual boot", "Backups", "Diagnostics", "Repair"];
+    private static readonly string[] PageIcons = ["\uE80F", "\uE7F4", "\uE713", "\uE950", "\uE8AB", "\uE8F1", "\uE9D9", "\uE90F"];
     private readonly IBootService service;
     private readonly bool demo;
     private BootSnapshot? snapshot;
@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private bool busy, rendering;
     private Task? loadTask;
     private string currentPage = "Overview";
+    private readonly Dictionary<string, bool> dualChoices = [];
     private string optionsEntryId = "";
     private string menuBaseline = "", optionsBaseline = "", firmwareBaseline = "";
     private ComboBox defaultEntry = new(), menuEntryPicker = new(), entryPicker = new(), safeBoot = new(), menuPolicy = new(), firmwarePicker = new();
@@ -170,6 +171,7 @@ public sealed partial class MainWindow : Window
     }
     private void ShowError(string message)
     {
+        message = FriendlyErrors.Append(message);
         StatusText.Text = message;
         if (!SkipConfirmationsForSmoke) MessageBox.Show(this, message, "Uoo Boot Manager", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
@@ -183,7 +185,7 @@ public sealed partial class MainWindow : Window
             if (!snapshot.Entries.Any(x => x.Id == optionsEntryId && x.IsWindows)) optionsEntryId = snapshot.Entries.FirstOrDefault(x => x.IsCurrent && x.IsWindows)?.Id ?? snapshot.Entries.FirstOrDefault(x => x.IsWindows)?.Id ?? "";
             pages.Clear();
             pages["Overview"] = BuildOverview(); pages["Windows boot"] = BuildMenu();
-            pages["Entry options"] = BuildOptions(); pages["Firmware"] = BuildFirmware();
+            pages["Entry options"] = BuildOptions(); pages["Firmware"] = BuildFirmware(); pages["Dual boot"] = BuildDualBoot();
             pages["Backups"] = BuildBackups(); pages["Diagnostics"] = BuildDiagnostics(); pages["Repair"] = BuildRepair();
             PageHost.Content = pages[currentPage];
             menuBaseline = MenuFingerprint(); optionsBaseline = OptionsFingerprint(); firmwareBaseline = FirmwareFingerprint();
@@ -301,6 +303,40 @@ public sealed partial class MainWindow : Window
         if (SelectedFirmware is not { } entry) return;
         await RunMutationAsync(new BootRequest { Operation = BootOperation.DeleteFirmwareEntry, TargetId = entry.Id }, "Delete this firmware entry?", $"Remove the firmware registration for {entry.Description}. The EFI loader file stays on disk.\n\nEntry ID: {entry.Id}", entry.Id);
     }
+    /// <summary>
+    /// Applies the selected dual-boot steps one validated request at a time. Each step is resolved against the
+    /// snapshot left by the previous step, so a failed step stops the sequence after its own rollback.
+    /// </summary>
+    internal async Task<bool> FixDualBootAsync()
+    {
+        if (busy || snapshot is null) return false;
+        var plan = DualBoot.Analyze(Snapshot);
+        var chosen = plan.Steps.Where(step => dualChoices.GetValueOrDefault(step.Id)).ToList();
+        if (!plan.Supported || chosen.Count == 0) { ShowError("Select at least one dual-boot step to apply."); return false; }
+        var summary = "Uoo will apply, in this order:\n" + string.Join("\n", chosen.Select((step, index) => $"{index + 1}. {step.Title}")) +
+            "\n\nEach step is validated and backed up first. If a step fails it is rolled back and the remaining steps are skipped." +
+            (demo ? "" : " Windows asks for administrator approval for each step.") + " The PC will not restart.";
+        if (HasDrafts) summary += "\n\nAny unapplied changes on other pages will be reloaded.";
+        if (!Confirm("Fix dual boot?", summary, null, BootValidation.RequiresRecoveryKey(Snapshot), out var acknowledged)) return false;
+        List<string> done = [];
+        foreach (var chosenStep in chosen)
+        {
+            var step = DualBoot.Analyze(Snapshot).Steps.FirstOrDefault(candidate => candidate.Id == chosenStep.Id);
+            if (step is null) continue;
+            BootRequest request;
+            try { request = DualBoot.BuildRequest(step, Snapshot) with { RecoveryKeyAcknowledged = acknowledged }; }
+            catch (ArgumentException error) { ShowError(error.Message + (done.Count > 0 ? " Already applied: " + string.Join("; ", done) + "." : "")); return false; }
+            if (!await ExecuteAsync(request, true, false))
+            {
+                if (done.Count > 0) StatusText.Text = "Stopped after: " + string.Join("; ", done) + ". Check Backups to review or restore.";
+                return false;
+            }
+            done.Add(step.Title);
+        }
+        StatusText.Text = done.Count == 0 ? "Nothing needed fixing." : "Dual-boot fix applied: " + string.Join("; ", done) + ". The PC was not restarted.";
+        return true;
+    }
+
     private async Task RepairAsync()
     {
         var plan = Snapshot.Repair;

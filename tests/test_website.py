@@ -19,7 +19,7 @@ class LandingPageTests(unittest.TestCase):
 
     def test_docs_pages_are_indexable_and_listed_in_sitemap(self):
         sitemap = (ROOT / "website/sitemap.xml").read_text()
-        for guide in ("getting-started", "windows", "ubuntu", "encrypted-disks", "faq"):
+        for guide in ("getting-started", "windows", "ubuntu", "encrypted-disks", "troubleshooting", "faq"):
             self.assertTrue((ROOT / "website/docs" / guide / "index.html").is_file())
             self.assertIn(f"https://uoo.lolisoft.eu/docs/{guide}/", sitemap)
 

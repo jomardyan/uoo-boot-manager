@@ -72,6 +72,10 @@ public sealed class ElevatedBootService : IBootService
         {
             return new() { Success = false, Message = "Administrator authentication was canceled. Your draft has been kept." };
         }
+        catch (Win32Exception error) when (error.NativeErrorCode is 2 or 3)
+        {
+            return new() { Success = false, Message = "The Uoo administrator helper (Uoo.BootHelper.exe) was not found next to the application. Reinstall Uoo with the installer; the portable ZIP supports only the demo and read-only inspection." };
+        }
         catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or JsonException or Win32Exception or OperationCanceledException)
         {
             return new() { Success = false, Message = error is OperationCanceledException ? "The administrator operation timed out. Reload to inspect the final state before trying again." : error.Message };

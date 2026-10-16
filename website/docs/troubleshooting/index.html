@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dual-boot troubleshooting: GRUB, BitLocker, Secure Boot, ESP and NVRAM</title>
+  <meta name="description" content="Fix common Windows and Ubuntu dual-boot problems: Windows missing from GRUB, BitLocker recovery, read-only NTFS, wrong clock, full EFI partition, Secure Boot and 2026 certificates.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/troubleshooting/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="Dual-boot troubleshooting: GRUB, BitLocker, Secure Boot, ESP and NVRAM">
+  <meta property="og:description" content="Fix common Windows and Ubuntu dual-boot problems: Windows missing from GRUB, BitLocker recovery, read-only NTFS, wrong clock, full EFI partition, Secure Boot and 2026 certificates.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/troubleshooting/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"Troubleshooting","item":"https://uoo.lolisoft.eu/docs/troubleshooting/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/troubleshooting/" aria-current="page">Troubleshooting</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Troubleshooting</span></p>
+      <h1 class="doc-title">Dual-boot troubleshooting</h1>
+      <p class="doc-lead">The most common dual-boot problems, why they happen, what Uoo does, and what you can do yourself.</p>
+
+      <p>These are the problems dual-boot users report most often, with what Uoo's <a href="/docs/ubuntu/">Dual boot page</a> can fix, what it only reports, and what you must do yourself. The causes come from vendor documentation and community reports linked in each section; hardware varies, so treat the community items as leads, not guarantees.</p>
+      <ul>
+        <li><a href="#windows-missing">Windows is missing from the GRUB menu</a></li>
+        <li><a href="#no-grub-menu">The GRUB menu never appears</a></li>
+        <li><a href="#firmware-ignores">The firmware forgets or ignores the Ubuntu entry</a></li>
+        <li><a href="#bitlocker">Windows asks for a BitLocker recovery key</a></li>
+        <li><a href="#ntfs-readonly">A Windows drive is read-only or will not mount in Linux</a></li>
+        <li><a href="#clock">The clock is wrong after switching systems</a></li>
+        <li><a href="#esp-full">The EFI System Partition is full</a></li>
+        <li><a href="#nvram-full">efibootmgr says "No space left on device"</a></li>
+        <li><a href="#efivars">UEFI variables are read-only or unsupported</a></li>
+        <li><a href="#mixed-mode">Legacy BIOS and UEFI are mixed</a></li>
+        <li><a href="#secure-boot">Secure Boot errors and the 2026 certificate change</a></li>
+        <li><a href="#vmd">Linux cannot see the disk (Intel RST/VMD)</a></li>
+      </ul>
+
+      <h2 id="windows-missing">Windows is missing from the GRUB menu</h2>
+      <p><strong>You see:</strong> GRUB lists Ubuntu but not Windows, and update-grub prints that os-prober will not be executed.</p>
+      <p><strong>Why it happens:</strong> GRUB's tool for finding other systems, os-prober, is disabled by default since GRUB 2.06 (Ubuntu 22.04 and later). It also cannot see Windows when Windows' EFI partition is not mounted or when it is on another disk.</p>
+      <p><strong>What Uoo does:</strong> The Dual boot page adds a verified GRUB entry for Windows Boot Manager when its EFI partition is mounted, or turns on <code>GRUB_DISABLE_OS_PROBER</code> when it is not. It tells you which later GRUB file overrides the setting if one does, and names unmounted EFI partitions.</p>
+      <p><strong>What you can do:</strong> Manually: set <code>GRUB_DISABLE_OS_PROBER=false</code> in <code>/etc/default/grub</code>, install <code>os-prober</code> if needed, and run <code>sudo update-grub</code>. BitLocker does not hide Windows' boot files from this check.</p><p class="source">Sources: <a href="https://www.omgubuntu.co.uk/2021/12/grub-doesnt-detect-windows-linux-distros-fix">OMG! Ubuntu</a> · <a href="https://itsfoss.com/grub-os-prober/">It&#39;s FOSS</a></p>
+
+      <h2 id="no-grub-menu">The GRUB menu never appears</h2>
+      <p><strong>You see:</strong> The computer starts Windows straight away, or Ubuntu starts without a menu.</p>
+      <p><strong>Why it happens:</strong> Either Windows Boot Manager comes first in the firmware boot order (Windows updates and firmware resets often put it there), or GRUB is set to hide its menu (<code>GRUB_TIMEOUT_STYLE=hidden</code> or a timeout of 0).</p>
+      <p><strong>What Uoo does:</strong> Fix dual boot can show the menu and put Ubuntu's entry first, after a backup. On a BitLocker system it leaves the reordering unselected, because starting Windows through GRUB can change what the TPM measures.</p>
+      <p><strong>What you can do:</strong> Run <code>efibootmgr</code> to see the order, or use the Firmware page. You can also pick Ubuntu once from the firmware boot menu (often F12 or Esc) without changing anything.</p><p class="source">Source: <a href="https://www.linux.org/threads/how-to-fix-grub-menu-dont-appear-on-restart-in-ubuntu-22-04-lts-and-windows-11-dual-boot.46550/">linux.org thread</a> (community)</p>
+
+      <h2 id="firmware-ignores">The firmware forgets or ignores the Ubuntu entry</h2>
+      <p><strong>You see:</strong> Ubuntu is missing from the boot menu after a firmware update, or an entry you created vanishes at the next restart.</p>
+      <p><strong>Why it happens:</strong> Some firmware drops boot entries it did not create, and some only trusts a loader at <code>EFI/BOOT/BOOTX64.EFI</code>. Community reports describe both behaviors.</p>
+      <p><strong>What Uoo does:</strong> Fix dual boot registers Ubuntu's loader in the firmware again and tells you when no fallback loader exists.</p>
+      <p><strong>What you can do:</strong> If the entry disappears again, install a fallback loader with <code>sudo grub-install --removable</code> (Uoo does not do this for you), or keep using the firmware's own boot menu. Updating the firmware can help.</p><p class="source">Source: <a href="https://forum.qubes-os.org/t/weird-boot-issue/18432/17">Qubes OS forum thread</a> (community)</p>
+
+      <h2 id="bitlocker">Windows asks for a BitLocker recovery key</h2>
+      <p><strong>You see:</strong> A blue recovery screen appears after you change the boot order, Secure Boot, firmware, or start Windows through GRUB.</p>
+      <p><strong>Why it happens:</strong> BitLocker with a TPM releases its key only when the boot chain matches what it was sealed to. Microsoft lists changes to the boot manager, the TPM, firmware and the platform measurements among the causes. Windows 11 24H2 can also turn on device encryption by itself, so you may not know it is active.</p>
+      <p><strong>What Uoo does:</strong> Uoo asks you to confirm you have the recovery password, keeps your boot order when registering Ubuntu, and leaves 'Ubuntu first' unselected. It never suspends or changes BitLocker.</p>
+      <p><strong>What you can do:</strong> Find your key first (<a href='/docs/encrypted-disks/'>encrypted disks guide</a>), suspend protection for planned changes, and check <code>manage-bde -status C:</code> in an administrator terminal to see whether C: is encrypted.</p><p class="source">Sources: <a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview">Microsoft Learn</a> · <a href="https://www.tomshardware.com/software/windows/windows-11-24h2-will-enable-bitlocker-encryption-for-everyone-happens-on-both-clean-installs-and-reinstalls">Tom&#39;s Hardware</a> · <a href="https://www.phoronix.com/news/BitLocker-Dual-Boot-Linux-Pain">Phoronix</a></p>
+
+      <h2 id="ntfs-readonly">A Windows drive is read-only or will not mount in Linux</h2>
+      <p><strong>You see:</strong> Linux reports that the NTFS volume is in an unsafe state or mounts it read-only.</p>
+      <p><strong>Why it happens:</strong> Windows Fast Startup (hybrid shutdown) leaves the volume hibernated instead of cleanly closed.</p>
+      <p><strong>What Uoo does:</strong> Reports the problem. On Windows it checks whether Fast Startup is on. It does not change the setting or touch the volume.</p>
+      <p><strong>What you can do:</strong> Shut Windows down fully (hold Shift while choosing Shut down) or turn off Fast Startup (<code>powercfg /h off</code>). Do not run <code>ntfsfix</code> on a Windows installation you still use.</p><p class="source">Sources: <a href="https://wiki.manjaro.org/index.php/How_to_mount_Windows_(NTFS)_filesystem_due_to_hibernation">Manjaro wiki</a> · <a href="https://www.linuxuprising.com/2019/01/fix-windows-10-or-8-partition-mounted.html">Linux Uprising</a></p>
+
+      <h2 id="clock">The clock is wrong after switching systems</h2>
+      <p><strong>You see:</strong> The time is off by your UTC offset after booting the other system.</p>
+      <p><strong>Why it happens:</strong> Windows keeps local time in the hardware clock by default; Linux expects UTC.</p>
+      <p><strong>What Uoo does:</strong> Reports it (on Windows it reads the setting). It does not change either system.</p>
+      <p><strong>What you can do:</strong> Pick one fix: <code>timedatectl set-local-rtc 1</code> on Linux, or set the <code>RealTimeIsUniversal</code> registry value to 1 on Windows. Do not do both.</p>
+
+      <h2 id="esp-full">The EFI System Partition is full</h2>
+      <p><strong>You see:</strong> Kernel or bootloader updates fail with 'No space left on device', or the installer refuses a small partition.</p>
+      <p><strong>Why it happens:</strong> Windows often creates a 100 MiB ESP shared by every operating system. Some distributions store kernels on the ESP, which fills it quickly, while a traditional GRUB layout needs far less.</p>
+      <p><strong>What Uoo does:</strong> Warns when less than 8 MiB is free on the mounted ESP. It does not resize or reformat anything.</p>
+      <p><strong>What you can do:</strong> Keep kernels on the Linux filesystem rather than the ESP, remove only vendor folders you are sure are obsolete, or enlarge the ESP from a live session with a backup. Do not reformat an ESP that holds Windows' boot files.</p><p class="source">Sources: <a href="https://forums.opensuse.org/t/install-dual-boot-with-existing-small-efi-partition/190517">openSUSE forum</a> · <a href="https://discourse.ubuntu.com/t/new-lubuntu-installation-boot-efi-partition-too-small/84938">Ubuntu Discourse</a> (community)</p>
+
+      <h2 id="nvram-full">efibootmgr says "No space left on device"</h2>
+      <p><strong>You see:</strong> Creating or changing a UEFI entry fails even though the disk has free space.</p>
+      <p><strong>Why it happens:</strong> The firmware's variable storage (NVRAM) is full. Every boot entry uses a little of a very small store.</p>
+      <p><strong>What Uoo does:</strong> Explains the error in plain language and rolls the change back.</p>
+      <p><strong>What you can do:</strong> Delete clearly unused entries on the Firmware page (old systems, USB drives), then retry. Never edit files under <code>/sys/firmware/efi/efivars</code> by hand.</p><p class="source">Source: <a href="https://yhetil.org/guix/87v99i99cr.fsf@nckx/t/">GNU Guix bug report</a> (community)</p>
+
+      <h2 id="efivars">UEFI variables are read-only or unsupported</h2>
+      <p><strong>You see:</strong> efibootmgr reports a read-only file system, 'Operation not permitted', or that EFI variables are not supported.</p>
+      <p><strong>Why it happens:</strong> The variable store is mounted read-only, a variable is protected, or the system started in legacy BIOS mode.</p>
+      <p><strong>What Uoo does:</strong> Detects a read-only variable store and offers no firmware steps; failures are explained when they happen.</p>
+      <p><strong>What you can do:</strong> Remount with <code>sudo mount -o remount,rw /sys/firmware/efi/efivars</code>, and make sure the system starts in UEFI mode.</p>
+
+      <h2 id="mixed-mode">Legacy BIOS and UEFI are mixed</h2>
+      <p><strong>You see:</strong> Ubuntu starts in legacy (CSM) mode, but Windows was installed in UEFI mode, so GRUB cannot start Windows.</p>
+      <p><strong>Why it happens:</strong> BIOS-mode GRUB cannot boot a UEFI Windows. The two modes must match.</p>
+      <p><strong>What Uoo does:</strong> Detects a legacy session on a disk with an EFI System Partition and tells you which direction to change.</p>
+      <p><strong>What you can do:</strong> Switch the firmware to UEFI mode, then repair Ubuntu's UEFI loader from the Repair page. Converting Windows is much riskier and is not offered.</p>
+
+      <h2 id="secure-boot">Secure Boot errors and the 2026 certificate change</h2>
+      <p><strong>You see:</strong> Linux stops with 'Verifying shim SBAT data failed' or a Secure Boot policy violation after a Windows update.</p>
+      <p><strong>Why it happens:</strong> In August 2024 a Windows update applied a Secure Boot revocation that blocked unpatched Linux boot loaders on some dual-boot systems; Microsoft confirmed it. Separately, Microsoft's 2011 Secure Boot certificates expire in 2026 (June 24, June 27, and October 19). Existing systems keep booting, but updates add the 2023 certificates over time, and changing the Secure Boot database changes the TPM measurement (PCR 7).</p>
+      <p><strong>What Uoo does:</strong> Notes the situation when Secure Boot is on and Windows is present. It never changes keys or Secure Boot.</p>
+      <p><strong>What you can do:</strong> Keep Ubuntu's shim updated and have your BitLocker or LUKS recovery key ready before firmware or Secure Boot updates. For an SBAT error, update shim from a working session or follow your distribution's guidance; temporarily disabling Secure Boot is a last resort and needs the recovery key on BitLocker systems.</p><p class="source">Sources: <a href="https://www.bleepingcomputer.com/news/microsoft/microsoft-confirms-august-updates-break-linux-boot-in-dual-boot-systems/">BleepingComputer</a> · <a href="https://support.microsoft.com/en-us/topic/windows-secure-boot-certificate-expiration-and-ca-updates-7ff40d33-95dc-4c3c-8725-a9b95457578e">Microsoft Support</a> · <a href="https://www.redhat.com/en/blog/expiration-secure-boot-signing-certificates-2026">Red Hat</a></p>
+
+      <h2 id="vmd">Linux cannot see the disk (Intel RST/VMD)</h2>
+      <p><strong>You see:</strong> The Ubuntu installer or a running system shows no NVMe drive, though Windows uses it.</p>
+      <p><strong>Why it happens:</strong> Intel RST/VMD (RAID) mode hides the drive from Linux. Switching the firmware to AHCI makes it visible but can leave Windows unable to boot unless Windows was prepared first.</p>
+      <p><strong>What Uoo does:</strong> Nothing: Uoo cannot manage a disk it cannot see.</p>
+      <p><strong>What you can do:</strong> Disable VMD in the firmware if it offers the option, or prepare Windows for AHCI before switching. Back up first and follow your PC maker's documentation.</p><p class="source">Sources: <a href="https://discourse.ubuntu.com/t/problem-booting-after-installing-ubuntu/74125">Ubuntu Discourse</a> · <a href="https://www.dell.com/community/Alienware-General-Read-Only/Alienware-17-R4-Windows-10-and-Ubuntu-dual-boot/m-p/5632911/highlight/true">Dell community</a> (community)</p>
+      <h2 id="repair-or-fix">Dual boot fix or Repair?</h2>
+      <p>Use <strong>Dual boot</strong> for settings: menu, discovery, entries, and order. Use <strong>Repair</strong> when loader files are damaged or missing, for example when no <code>EFI/ubuntu</code> folder exists. Repair needs a typed confirmation and a supported layout.</p>
+      <aside class="encryption-note"><span class="note-icon" aria-hidden="true">⚠</span><div><h3>Encrypted disk? Have your recovery key first.</h3><p>Before changing boot settings on a BitLocker or LUKS system, find your recovery password or passphrase and keep a copy on another device. <a href="/docs/encrypted-disks/">Read the encrypted-disk guide</a>.</p></div></aside>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

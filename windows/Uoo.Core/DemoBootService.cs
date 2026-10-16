@@ -20,7 +20,7 @@ public sealed class DemoBootService : IBootService
     {
         state = new()
         {
-            Demo = true, Revision = "demo-0", Machine = "Windows 11 PC (demo)", WindowsVersion = "Windows 11 24H2 · demo",
+            Demo = true, BitLockerProtectionEnabled = true, Revision = "demo-0", Machine = "Windows 11 PC (demo)", WindowsVersion = "Windows 11 24H2 · demo",
             Entries = [
                 new() { Id = WindowsId, Description = "Windows 11", Device = @"C:\", Path = @"\Windows\system32\winload.efi", SystemRoot = @"\Windows", IsCurrent = true, IsDefault = true, IsWindows = true },
                 new() { Id = OtherWindowsId, Description = "Windows 11 — Work", Device = @"D:\", Path = @"\Windows\system32\winload.efi", SystemRoot = @"\Windows", IsWindows = true }
@@ -31,6 +31,8 @@ public sealed class DemoBootService : IBootService
                 new() { Id = FirmwareUbuntuId, Description = "Ubuntu", Device = @"\Device\HarddiskVolume1", Path = @"\EFI\ubuntu\shimx64.efi" }
             ], Order = [FirmwareWindowsId, FirmwareUbuntuId], CurrentId = FirmwareWindowsId },
             Diagnostics = [new("Boot environment", "OK", "UEFI with Secure Boot enabled (demo)."), new("Windows BCD store", "OK", "Two Windows loaders and a valid default entry."), new("BitLocker", "Info", "Protection is enabled. Have your recovery key available before changing boot settings (demo)."), new("Demo mode", "Info", "Boot changes stay in memory for this session. Import and export use only the file you choose.")],
+            LinuxLoaders = [new("Ubuntu", @"\\?\Volume{be85a039-98b2-451b-a37f-aa7a87160bb8}\", @"\EFI\ubuntu\shimx64.efi"), new("Fedora", @"\\?\Volume{be85a039-98b2-451b-a37f-aa7a87160bb8}\", @"\EFI\fedora\shimx64.efi")],
+            DualBootFacts = new() { FastStartupEnabled = true, ClockIsUtc = false, SecureBootEnabled = true, Esps = [new(@"\\?\Volume{be85a039-98b2-451b-a37f-aa7a87160bb8}\", 62L * 1024 * 1024, 100L * 1024 * 1024)] },
             Repair = new() { Available = true, WindowsDirectory = @"C:\Windows", SystemPartition = @"\\?\Volume{be85a039-98b2-451b-a37f-aa7a87160bb8}\", Description = "Back up BCD and Microsoft EFI files, then rebuild the running Windows installation's UEFI boot files with BCDBoot. Other EFI vendors are preserved.", Confirmation = "REPAIR" }
         };
     }

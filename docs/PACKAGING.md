@@ -8,8 +8,8 @@ AppImage and Snap carry the same icon inside the desktop bundle; Snap also
 uses the 512 px PNG for its package metadata. Sources and platform exports
 are documented in [the icon guide](../assets/icons/README.md).
 
-The **Build Linux packages** workflow in `.github/workflows/verify.yml` runs on
-pushes, pull requests, and manual dispatches. It builds these outputs:
+The **Build Linux packages** workflow in `.github/workflows/verify.yml` runs
+only when you start it manually (**Actions → Run workflow**); no workflow runs automatically on a push or pull request. It builds these outputs:
 
 | Format | Architecture | Runtime |
 | --- | --- | --- |
@@ -127,19 +127,21 @@ git tag v2.2.1
 git push origin v2.2.1
 ```
 
-Alternatively, push a commit on `main` whose first line is `release: v2.2.1`
-after synchronizing those version files. **Create requested release tag**
-checks the requested version, creates the tag at that exact commit, and
-dispatches both package workflows on it. It refuses to move an existing tag
+Pushing a tag no longer starts a build by itself; run **Build Linux packages** and
+**Windows 11 packages** manually on that tag (**Run workflow**, choosing the tag).
+
+Alternatively, after synchronizing those version files and pushing `main`, run
+**Create requested release tag** manually on `main` with version `2.2.1`. It checks that
+the requested version equals the Linux and Windows versions, creates the tag at that
+exact commit, and dispatches both package workflows on it. It refuses to move an existing tag
 to another commit. This uses the repository token without additional secrets.
 
-For release-request commits, the publishing job waits for successful Linux
+For a release requested this way, the publishing job waits for successful Linux
 and Windows builds at the same immutable tag and commit. It requires the
 complete package set, downloads every asset, verifies both SHA256 manifests,
 and then publishes the release with the checked-in versioned release notes.
-Directly pushed tags still create drafts for manual publication.
-To publish a release whose tag already exists, push a commit on `main` whose
-first line is `publish: v2.2.1`, or run **Publish an existing verified
+Directly pushed tags still produce drafts for manual publication once you run the package workflows on them.
+To publish a release whose tag already exists, run **Publish an existing verified
 release** (`publish-release.yml`) manually with that version; it verifies the
 packages from the existing tag and publishes them with its release notes.
 
@@ -147,7 +149,7 @@ The workflow rejects a mismatched tag or metadata version. All tests and all
 package builds and architecture checks must pass before the workflow creates a **draft** GitHub
 release and attaches the packages and checksums. For directly pushed tags,
 review and publish that draft from GitHub Releases after both platform
-workflows succeed. Release-request commits use the verified publishing job
+workflows succeed. Releases requested with **Create requested release tag** use the verified publishing job
 described above. Only tag-creation, publishing, and
 release jobs receive `contents: write`; the
 normal build jobs use read access. No additional repository secrets are needed.

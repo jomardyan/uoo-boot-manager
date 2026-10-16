@@ -49,14 +49,26 @@ def trusted_helper_available():
 
 
 def run_helper(request):
-    result = subprocess.run(desktop_runtime.host_command(["/usr/bin/pkexec", str(AUTH_HELPER), "--stdin"]),
-                            input=json.dumps(request), capture_output=True, text=True, timeout=600)
+    command = desktop_runtime.host_command(["/usr/bin/pkexec", str(AUTH_HELPER), "--stdin"])
+    try:
+        result = subprocess.run(command, input=json.dumps(request), capture_output=True, text=True, timeout=600)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("The administrator action did not finish within 10 minutes, so Uoo stopped waiting. "
+                           "Reload to see what actually changed before trying again.") from exc
+    except FileNotFoundError as exc:
+        raise RuntimeError("pkexec is not installed, so administrator actions are unavailable. Install polkit "
+                           "(sudo apt install polkitd pkexec) or use the demo.") from exc
+    except OSError as exc:
+        raise RuntimeError(f"The administrator helper could not be started: {exc}") from exc
     try:
         response = json.loads(result.stdout)
     except ValueError as exc:
-        if result.returncode in (126, 127):
-            raise RuntimeError("Administrator authentication was cancelled or unavailable.") from exc
-        raise RuntimeError(result.stderr.strip() or "The administrator helper returned no valid response.") from exc
+        if result.returncode == 126:
+            raise RuntimeError("Administrator authentication was cancelled or you are not authorized. Nothing was changed.") from exc
+        if result.returncode == 127:
+            raise RuntimeError("Administrator authentication failed or no polkit agent is running. Start Uoo from a desktop "
+                               "session, or install and start a polkit authentication agent, then try again. Nothing was changed.") from exc
+        raise RuntimeError(result.stderr.strip() or "The administrator helper returned no valid response. Reload to check the current state.") from exc
     if not isinstance(response, dict) or not response.get("ok") or result.returncode:
         raise RuntimeError(response.get("error", "The action could not be completed.") if isinstance(response, dict) else "Invalid helper response.")
     return response
@@ -78,6 +90,8 @@ class BootWindow(Adw.ApplicationWindow):
         self.custom_draft = []
         self.order = []
         self.repair_plan = None
+        self.dual_plan = None
+        self.dual_choices = {}
         self.busy = False
         self.closed = False
         self.installed = False if self.demo else trusted_helper_available()
@@ -138,6 +152,7 @@ class BootWindow(Adw.ApplicationWindow):
         self.set_content(shell)
         self._build_boot()
         self._build_firmware()
+        self._build_dualboot()
         self._build_custom()
         self._build_advanced()
         self._build_appearance()
@@ -207,6 +222,20 @@ class BootWindow(Adw.ApplicationWindow):
         self.buttons["firmware_next"] = next_menu
         page.footer.append(next_menu)
         self._add_button(page, "order_apply", "Save order", self.apply_order, suggested=True)
+
+    def _build_dualboot(self):
+        page = self._page("dualboot", "Dual boot", "Check how Ubuntu and Windows start, then apply the fixes Uoo can make safely. You choose every step; Uoo backs up first and never restarts your computer.", "view-dual-symbolic")
+        self.dual_group = ui.group("Check results", "The check reads boot and storage settings with administrator access. Nothing changes until you apply fixes.")
+        self.dual_placeholder = ui.row("Check dual boot", "The check reports problems, encrypted disks, and the steps Uoo can apply.", "dialog-information-symbolic")
+        self.dual_group.add(self.dual_placeholder)
+        self.dual_rows = [self.dual_placeholder]
+        self.dual_steps_group = ui.group("Fixes Uoo can apply", "Selected steps run in order after a backup. If one fails, Uoo restores the backup.")
+        self.dual_steps_group.set_visible(False)
+        self.dual_step_rows = []
+        page.body.append(self.dual_group)
+        page.body.append(self.dual_steps_group)
+        self._add_button(page, "dualboot_check", "Check dual boot", self.inspect_dual_boot)
+        self._add_button(page, "dualboot_fix", "Fix dual boot…", self.execute_dual_boot_fix, suggested=True)
 
     def _build_custom(self):
         page = self._page("custom", "Custom entries", "Stage EFI loader or Linux kernel entries, then apply the draft to rebuild GRUB.", "list-add-symbolic")
@@ -314,7 +343,7 @@ class BootWindow(Adw.ApplicationWindow):
             self.stack.set_visible_child_name(selected.page_key)
 
     def navigate(self, key):
-        for index in range(8):
+        for index in range(len(self.pages)):
             item = self.sidebar.get_row_at_index(index)
             if item and item.page_key == key:
                 self.sidebar.select_row(item)
@@ -348,7 +377,7 @@ class BootWindow(Adw.ApplicationWindow):
         self.last_dialog = dialog
         dialog.present(parent or self)
 
-    def confirm(self, heading, message, callback, label="Apply", destructive=False, typed=None):
+    def confirm(self, heading, message, callback, label="Apply", destructive=False, typed=None, acknowledge=None):
         if self.confirm_handler:
             if self.confirm_handler(heading, message, typed):
                 callback()
@@ -359,15 +388,29 @@ class BootWindow(Adw.ApplicationWindow):
         dialog.set_default_response("cancel")
         dialog.set_close_response("cancel")
         dialog.set_response_appearance("apply", Adw.ResponseAppearance.DESTRUCTIVE if destructive else Adw.ResponseAppearance.SUGGESTED)
-        typed_entry = None
-        if typed:
-            typed_entry = Gtk.Entry(placeholder_text=f"Type {typed} to confirm")
-            dialog.set_extra_child(typed_entry)
+        typed_entry = Gtk.Entry(placeholder_text=f"Type {typed} to confirm") if typed else None
+        acknowledged = Gtk.CheckButton(label=acknowledge) if acknowledge else None
+
+        def ready():
+            return ((not typed or typed_entry.get_text() == typed)
+                    and (not acknowledge or acknowledged.get_active()))
+
+        controls = [widget for widget in (acknowledged, typed_entry) if widget]
+        if controls:
+            for widget in controls:
+                widget.connect("changed" if widget is typed_entry else "toggled",
+                               lambda *_args: dialog.set_response_enabled("apply", ready()))
+            if len(controls) == 1:
+                extras = controls[0]
+            else:
+                extras = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+                for widget in controls:
+                    extras.append(widget)
+            dialog.set_extra_child(extras)
             dialog.set_response_enabled("apply", False)
-            typed_entry.connect("changed", lambda entry: dialog.set_response_enabled("apply", entry.get_text() == typed))
 
         def response(_dialog, response_id):
-            if response_id == "apply" and (not typed or typed_entry.get_text() == typed):
+            if response_id == "apply" and ready():
                 callback()
 
         dialog.connect("response", response)
@@ -530,6 +573,8 @@ class BootWindow(Adw.ApplicationWindow):
         self._render_diagnostics()
         self.repair_plan = None
         self._render_repair()
+        self.dual_plan = None
+        self._render_dualboot()
         if self.demo:
             self.banner.set_title("Preview mode — no system files or firmware are modified")
             self.banner.set_button_label("")
@@ -574,13 +619,13 @@ class BootWindow(Adw.ApplicationWindow):
     def has_unsaved_changes(self):
         return self.baseline is not None and self._draft() != self.baseline
 
-    def _mutate(self, request, title, summary, label="Apply", destructive=False, typed=None):
+    def _mutate(self, request, title, summary, label="Apply", destructive=False, typed=None, acknowledge=None):
         if not self._can_change():
             return
         suffix = "This is a preview. Your computer will not be modified." if self.demo else "Uoo creates a backup and requests administrator authentication."
         if self.has_unsaved_changes() and request["action"] not in ("create_backup", "delete_backup"):
             suffix += " Saved settings will be reloaded; other unapplied drafts will be discarded."
-        self.confirm(title, summary + "\n\n" + suffix, lambda: self.dispatch(request), label, destructive, typed)
+        self.confirm(title, summary + "\n\n" + suffix, lambda: self.dispatch(request), label, destructive, typed, acknowledge)
 
     def _can_change(self):
         return not self.busy and (self.demo or self.installed)
@@ -625,6 +670,7 @@ class BootWindow(Adw.ApplicationWindow):
         self.buttons["backup_actions"].set_sensitive(enabled and backup is not None)
         self.buttons["backup_restore"].set_sensitive(enabled and backup is not None and backup.get("kind") != "corrupt")
         self.buttons["repair_execute"].set_sensitive(enabled and bool(self.repair_plan and self.repair_plan.get("supported")))
+        self.buttons["dualboot_fix"].set_sensitive(enabled and bool(self.dual_plan and self._dual_selected()))
         self.reload_button.set_sensitive(not self.busy)
         self.admin_button.set_sensitive(not self.busy and self.installed and not self.demo)
         self.stack.set_sensitive(not self.busy)
@@ -1177,6 +1223,74 @@ class BootWindow(Adw.ApplicationWindow):
         target = plan["confirmation"]
         self._mutate({"action": "repair", "plan": plan["id"], "confirm": target}, "Execute bootloader repair",
                      f"Target: {target}\n\n" + "\n".join(plan.get("summary", [])) + f"\n\nType {target} to confirm.", "Repair", True, target)
+
+    def _dual_selected(self):
+        return [step["id"] for step in (self.dual_plan or {}).get("steps", []) if self.dual_choices.get(step["id"])]
+
+    def _render_dualboot(self):
+        for item in self.dual_rows:
+            self.dual_group.remove(item)
+        for item in self.dual_step_rows:
+            self.dual_steps_group.remove(item)
+        self.dual_rows, self.dual_step_rows = [], []
+        plan = self.dual_plan
+        if not plan:
+            self.dual_group.add(self.dual_placeholder)
+            self.dual_rows.append(self.dual_placeholder)
+            self.dual_steps_group.set_visible(False)
+            return
+        icons = {"problem": "dialog-error-symbolic", "warning": "dialog-warning-symbolic", "info": "dialog-information-symbolic"}
+        findings = list(plan.get("findings", []))
+        if not plan.get("supported"):
+            findings.insert(0, {"severity": "warning", "title": "Dual-boot check unavailable", "detail": plan.get("reason", "")})
+        elif not any(item["severity"] in ("problem", "warning") for item in findings):
+            findings.insert(0, {"severity": "ok", "title": "No dual-boot problems found",
+                                "detail": "Uoo found nothing it needs to fix. Information below may still help."})
+        for finding in findings:
+            item = ui.row(finding["title"], finding["detail"], icons.get(finding["severity"], "emblem-ok-symbolic"))
+            item.set_subtitle_lines(0)
+            self.dual_group.add(item)
+            self.dual_rows.append(item)
+        steps = plan.get("steps", [])
+        for step in steps:
+            item = ui.switch(step["title"], bool(self.dual_choices.get(step["id"])), step["detail"])
+            item.set_subtitle_lines(0)
+            item.connect("notify::active", lambda widget, _param, key=step["id"]: self._dual_toggled(key, widget.get_active()))
+            self.dual_steps_group.add(item)
+            self.dual_step_rows.append(item)
+        self.dual_steps_group.set_visible(bool(steps))
+
+    def _dual_toggled(self, key, active):
+        self.dual_choices[key] = active
+        self._controls()
+
+    def inspect_dual_boot(self):
+        def show(response):
+            self.dual_plan = response["plan"]
+            self.dual_choices = {step["id"]: bool(step["recommended"]) for step in self.dual_plan.get("steps", [])}
+            self._render_dualboot()
+            self._controls()
+            count = len(self.dual_plan.get("steps", []))
+            self._status(f"Dual-boot check finished. {count} fix{'es' if count != 1 else ''} available." if count
+                         else "Dual-boot check finished. Nothing needs fixing.")
+
+        self.dispatch({"action": "dual_boot_plan"}, show)
+
+    def execute_dual_boot_fix(self):
+        plan = self.dual_plan
+        chosen = self._dual_selected()
+        if not plan or not chosen:
+            return
+        titles = {step["id"]: step["title"] for step in plan["steps"]}
+        summary = "Uoo will apply, in this order:\n" + "\n".join(f"{number}. {titles[key]}" for number, key in enumerate(chosen, 1))
+        acknowledge = None
+        if plan.get("requires_acknowledgement"):
+            volumes = ", ".join(plan["encrypted"]["bitlocker"])
+            summary += (f"\n\nBitLocker-encrypted Windows volumes ({volumes}) were found. Boot changes can make Windows ask for its recovery "
+                        "password. Uoo never changes encryption.")
+            acknowledge = "I have my BitLocker recovery password"
+        self._mutate({"action": "dual_boot_fix", "plan": plan["id"], "steps": chosen,
+                      "acknowledge_recovery": bool(acknowledge)}, "Fix dual boot", summary, "Apply fixes", False, None, acknowledge)
 
     def _close_requested(self, _window):
         if self.busy:

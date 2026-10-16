@@ -9,6 +9,7 @@ import json
 import re
 
 from .core import DEMO_CONFIG, parse_entries
+from .dualboot import UBUNTU_LABEL, WINDOWS_ENTRY_TITLE, WINDOWS_LOADER, analyze
 from .models import (compile_custom_entries, validate_custom_entries,
                      validate_grub_changes, validate_png)
 
@@ -40,6 +41,10 @@ class DemoManager:
              "fstype": "ext4", "uuid": "12345678-1234-1234-abcd-123456789abc",
              "mountpoint": "/", "mountpoints": ["/"], "pkname": "/dev/sda", "partn": 2,
              "parttype": "0fc63daf-8483-4772-8e79-3d69d8477de4", "readonly": False, "esp": False},
+            {"name": "sda3", "path": "/dev/sda3", "type": "part", "size": 128849018880,
+             "fstype": "BitLocker", "uuid": "", "mountpoint": "", "mountpoints": [],
+             "pkname": "/dev/sda", "partn": 3,
+             "parttype": "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", "readonly": False, "esp": False},
         ]
         self._state = {
             "entries": [], "settings": {}, "firmware": {
@@ -272,6 +277,73 @@ class DemoManager:
                             "Rebuild and validate the GRUB menu. No restart is performed."],
                 "supported": True, "reason": ""}
 
+    def _dual_boot_plan(self):
+        """Analyze the demo's own state, so the plan reacts to what the user changes."""
+        firmware = self._state["firmware"]
+        label = lambda entry: entry["label"].lower()
+        state = {"grub_installed": True, "uefi": True, "secure_boot": "disabled (demo)",
+                 "grub_has_windows": any("windows" in entry.title.lower() for entry in self._menu()),
+                 "grub_style": str(self._grub["GRUB_TIMEOUT_STYLE"]), "grub_timeout": int(self._grub["GRUB_TIMEOUT"]),
+                 "os_prober_disabled": bool(self._grub["GRUB_DISABLE_OS_PROBER"]), "os_prober_installed": True,
+                 "windows_firmware": [entry["id"] for entry in firmware["entries"] if label(entry).startswith("windows boot manager")],
+                 "windows_loader": {"uuid": "ABCD-1234", "device": "/dev/sda1", "loader": WINDOWS_LOADER},
+                 "ubuntu_loader": {"loader": "/EFI/ubuntu/shimx64.efi", "disk": "/dev/sda", "partition": 1},
+                 "ubuntu_entries": [{"id": entry["id"], "active": entry["active"]} for entry in firmware["entries"] if label(entry) == UBUNTU_LABEL],
+                 "firmware_available": True, "firmware_order": list(firmware["order"]),
+                 "bitlocker": ["/dev/sda3"], "luks": [], "ntfs": []}
+        return analyze(state)
+
+    def _dual_boot_fix(self, request):
+        plan = self._dual_boot_plan()
+        if request.get("plan") != plan["id"]:
+            raise ValueError("The demo dual-boot plan changed. Check dual boot again and review the new plan.")
+        available = {item["id"]: item for item in plan["steps"]}
+        chosen = request.get("steps")
+        if chosen is None:
+            chosen = [item["id"] for item in plan["steps"] if item["recommended"]]
+        if (type(chosen) is not list or len(set(chosen)) != len(chosen)
+                or not all(type(item) is str and item in available for item in chosen)):
+            raise ValueError("Choose only steps from the reviewed dual-boot plan.")
+        if not chosen:
+            raise ValueError("Select at least one step to apply.")
+        if type(request.get("acknowledge_recovery", False)) is not bool:
+            raise ValueError("The recovery-key acknowledgement must be true or false.")
+        if plan["requires_acknowledgement"] and not request.get("acknowledge_recovery"):
+            raise ValueError("A BitLocker-encrypted volume was found. Confirm that you have its recovery key before changing boot settings. "
+                             "Uoo will not change encryption.")
+        backup = self._backup("all", "Complete demo configuration before the dual-boot fix",
+                              {**self._grub_state(), "firmware": self._firmware_state()})
+        firmware = self._state["firmware"]
+        if "grub_menu" in chosen:
+            self._grub["GRUB_TIMEOUT_STYLE"] = "menu"
+            if self._grub["GRUB_TIMEOUT"] == 0:
+                self._grub["GRUB_TIMEOUT"] = 10
+        if "os_prober" in chosen:
+            self._grub["GRUB_DISABLE_OS_PROBER"] = False
+        if "grub_chainloader" in chosen:
+            entry = {"id": "uoo-" + "d" * 32, "title": WINDOWS_ENTRY_TITLE, "type": "efi", "enabled": True,
+                     "uuid": "ABCD-1234", "loader": WINDOWS_LOADER}
+            self._state["custom_entries"] = [item for item in self._state["custom_entries"] if item["id"] != entry["id"]] + [entry]
+        if "uefi_create_ubuntu" in chosen:
+            used = {item["id"] for item in firmware["entries"]}
+            identifier = next(f"{number:04X}" for number in range(65536) if f"{number:04X}" not in used)
+            self._specifications[identifier] = {"label": UBUNTU_LABEL, "disk": "/dev/sda", "partition": 1,
+                                                "loader": "/EFI/ubuntu/shimx64.efi", "active": True}
+            firmware["entries"].append({"id": identifier, "label": UBUNTU_LABEL, "active": True})
+            firmware["entries"].sort(key=lambda item: item["id"])
+            if plan["encrypted"]["bitlocker"]:
+                firmware["order"].append(identifier)
+            else:
+                firmware["order"].insert(0, identifier)
+        if "uefi_order" in chosen:
+            ubuntu = next(item for item in firmware["entries"] if item["label"].lower() == UBUNTU_LABEL)
+            ubuntu["active"] = True
+            firmware["order"] = [ubuntu["id"]] + [item for item in firmware["order"] if item != ubuntu["id"]]
+        self._state["managed"] = True
+        return {"backup": backup, "applied": [available[name]["title"] for name in chosen],
+                "message": "Demo dual-boot fix applied: " + "; ".join(available[name]["title"] for name in chosen) +
+                           f". Pre-fix backup: {backup}. No restart was performed."}
+
     def dispatch(self, request):
         """Validate and simulate one action, returning independently copied data."""
         if type(request) is not dict or type(request.get("action")) is not str:
@@ -285,6 +357,7 @@ class DemoManager:
             "apply_background": {"png"}, "clear_background": set(), "create_backup": {"kind"},
             "backup_details": {"backup"}, "export_backup": {"backup"}, "import_configuration": {"data"},
             "delete_backup": {"backup"}, "restore": {"backup"}, "repair_plan": set(), "repair": {"plan", "confirm"},
+            "dual_boot_plan": set(), "dual_boot_fix": {"plan", "steps", "acknowledge_recovery"},
         }
         if action not in allowed or set(request) - allowed[action] - {"action"}:
             raise ValueError("Unsupported action or request field.")
@@ -491,6 +564,12 @@ class DemoManager:
                     self._state["grub_next"] = ""
             self._state["managed"] = True
             message = "Demo GRUB configuration imported; firmware remains unchanged."
+        elif action == "dual_boot_plan":
+            extra["plan"] = self._dual_boot_plan()
+            message = "Demo dual-boot check completed."
+        elif action == "dual_boot_fix":
+            extra = self._dual_boot_fix(request)
+            message = extra.pop("message")
         elif action == "repair_plan":
             extra["plan"] = self._repair_plan()
             message = "Demo repair plan inspected."

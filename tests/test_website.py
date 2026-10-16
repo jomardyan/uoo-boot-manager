@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,30 @@ spec.loader.exec_module(website_check)
 class LandingPageTests(unittest.TestCase):
     def test_source_page_references_existing_assets(self):
         website_check.check(ROOT / "website")
+
+    def test_docs_pages_are_indexable_and_listed_in_sitemap(self):
+        sitemap = (ROOT / "website/sitemap.xml").read_text()
+        for guide in ("getting-started", "windows", "ubuntu", "encrypted-disks", "faq"):
+            self.assertTrue((ROOT / "website/docs" / guide / "index.html").is_file())
+            self.assertIn(f"https://uoo.lolisoft.eu/docs/{guide}/", sitemap)
+
+    def test_checker_rejects_wrong_canonical_and_broken_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            site = Path(directory) / "site"
+            shutil.copytree(ROOT / "website", site, ignore=shutil.ignore_patterns("dist"))
+            page = site / "docs/faq/index.html"
+            original = page.read_text()
+            page.write_text(original.replace('href="https://uoo.lolisoft.eu/docs/faq/">', 'href="https://uoo.lolisoft.eu/docs/other/">', 1))
+            with self.assertRaisesRegex(ValueError, "canonical"):
+                website_check.check(site)
+            page.write_text(original.replace('href="/docs/windows/"', 'href="/docs/missing/"', 1))
+            with self.assertRaisesRegex(ValueError, "Missing or invalid"):
+                website_check.check(site)
+            page.write_text(original)
+            (site / "docs/unlisted").mkdir()
+            (site / "docs/unlisted/index.html").write_text(original)
+            with self.assertRaises(ValueError):
+                website_check.check(site)
 
     @unittest.skipUnless(shutil.which("node"), "Node is required for JavaScript behavior checks")
     def test_platform_downloads_and_preview_controls(self):

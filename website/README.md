@@ -28,3 +28,16 @@ The build copies the current application icons and screenshot into the site.
 The checked-in `assets/` copies also allow the website to build independently
 of the desktop source. Set the correct release version in `index.html` and
 `app.js` when preparing future releases.
+
+## Documentation pages and SEO
+
+`website/docs/` holds the static guides (getting started, Windows 11, Ubuntu,
+encrypted disks, FAQ). Each page is a complete HTML file using root-relative
+paths (`/styles.css`, `/docs/...`), so serve the site from the domain root.
+When you add or rename a page, also update `sitemap.xml` and the guide lists.
+`make website` runs the checker (`scripts/check-website.py`), which fails on
+a missing or duplicate title, a missing meta description, a canonical URL that
+does not match the page path, invalid JSON-LD, broken links or anchors, and a
+sitemap that does not list exactly the indexable pages. `404.html` is marked
+`noindex`. After deploying, submit `https://uoo.lolisoft.eu/sitemap.xml` in
+Google Search Console and Bing Webmaster Tools.

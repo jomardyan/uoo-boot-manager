@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uoo Boot Manager on Windows 11: BCD, UEFI, backups and repair</title>
+  <meta name="description" content="Manage Windows Boot Manager, BCD options, UEFI boot order, backups and repair on Windows 11 with Uoo. Covers UAC, BitLocker handling, requirements and limits.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/windows/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="Uoo Boot Manager on Windows 11: BCD, UEFI, backups and repair">
+  <meta property="og:description" content="Manage Windows Boot Manager, BCD options, UEFI boot order, backups and repair on Windows 11 with Uoo. Covers UAC, BitLocker handling, requirements and limits.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/windows/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"Windows 11","item":"https://uoo.lolisoft.eu/docs/windows/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/" aria-current="page">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Windows 11</span></p>
+      <h1 class="doc-title">Uoo on Windows 11</h1>
+      <p class="doc-lead">A native WPF desktop for Windows Boot Manager's BCD store and local UEFI registrations.</p>
+
+      <h2 id="requirements">Requirements</h2>
+      <ul>
+        <li>Windows 11, build 22000 or later (x64 or ARM64). The installer includes the .NET runtime.</li>
+        <li>Administrator approval through UAC for live changes.</li>
+        <li>UEFI firmware features need UEFI boot mode; repair needs a verified local GPT/FAT32 system partition.</li>
+      </ul>
+
+      <h2 id="what-it-manages">What Uoo manages on Windows</h2>
+      <table>
+        <thead><tr><th>Page</th><th>What you can do</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Windows boot</th><td>Default Windows installation, boot order, timeout, menu visibility, one-time selection; rename, copy, and remove supported loader entries.</td></tr>
+          <tr><th scope="row">Entry options</th><td>Safe mode, alternate shell, boot log, driver names, base video, recovery, graphical or legacy boot menu.</td></tr>
+          <tr><th scope="row">Firmware</th><td>UEFI order and inclusion, one-time selection, registration of an existing local EFI loader.</td></tr>
+          <tr><th scope="row">Backups</th><td>Private BCD and firmware backups, integrity inspection, restore, and typed JSON import and export.</td></tr>
+          <tr><th scope="row">Diagnostics</th><td>Running Windows loader, administrator access, boot mode, Secure Boot, BitLocker, and repair prerequisites.</td></tr>
+          <tr><th scope="row">Repair</th><td>Rebuild the running Windows installation's UEFI boot files with BCDBoot on a verified system partition.</td></tr>
+        </tbody>
+      </table>
+      <p>Uoo exposes typed options only. It does not run arbitrary BCDEdit commands or scripts.</p>
+
+      <h2 id="bitlocker">BitLocker</h2>
+      <p>Uoo reports BitLocker protection before boot changes and requires you to acknowledge that you have your recovery key when protection is on or its state cannot be read. It does <strong>not</strong> suspend BitLocker, disable Secure Boot, enable test signing, or restart your PC. See <a href="/docs/encrypted-disks/">BitLocker and encrypted disks</a> for how to find your key and suspend protection for a planned change.</p>
+
+      <h2 id="admin">Administrator access and the helper</h2>
+      <p>The desktop runs under your normal account. System changes use a fixed administrator helper installed under <code>C:\Program Files\Uoo Boot Manager</code>, reached through an authenticated local pipe. Uoo rejects administrator actions from user-writable installations, so use the installer, not the portable ZIP, for live changes. The ZIP supports the demo and read-only inspection.</p>
+
+      <h2 id="backups">Backups and uninstalling</h2>
+      <p>Backups are private and stored under <code>%ProgramData%\Uoo\BootManager</code>. Uninstalling the app keeps them and keeps any boot settings you applied. Installing and uninstalling never modify boot configuration.</p>
+
+      <h2 id="limits">Limits</h2>
+      <ul>
+        <li>Windows Boot Manager cannot load Linux kernels or draw a custom background like GRUB. Register an existing local Linux EFI loader to select an installed Linux bootloader.</li>
+        <li>Uoo does not edit Ubuntu's GRUB configuration from Windows.</li>
+        <li>The running, default, and last Windows loaders and the Windows Boot Manager firmware entry are protected from deletion.</li>
+        <li>Legacy BIOS, offline Windows repair, and unsupported storage layouts are not presented as verified repair targets.</li>
+        <li>Windows packages are currently unsigned.</li>
+      </ul>
+      <p>Full details: <a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/docs/WINDOWS.md">Windows guide on GitHub</a>.</p>
+      <aside class="encryption-note"><span class="note-icon" aria-hidden="true">⚠</span><div><h3>Encrypted disk? Have your recovery key first.</h3><p>Before changing boot settings on a BitLocker or LUKS system, find your recovery password or passphrase and keep a copy on another device. <a href="/docs/encrypted-disks/">Read the encrypted-disk guide</a>.</p></div></aside>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

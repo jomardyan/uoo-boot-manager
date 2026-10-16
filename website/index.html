@@ -3,13 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Uoo Boot Manager brings boot choices, UEFI settings, and recovery into a clear native desktop for Windows 11 and Ubuntu.">
+  <meta name="description" content="Uoo is a free, open-source boot manager for Windows 11 and Ubuntu. Edit the boot menu, GRUB and BCD options, UEFI boot order and backups from a native desktop app.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="author" content="Hayk Jomardyan">
   <meta name="theme-color" content="#f4f6fb">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Uoo Boot Manager — A clear start. Every time.">
-  <meta property="og:description" content="Native boot configuration for Windows 11 and Ubuntu. Choose what starts next, review changes, and keep a recovery path.">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:title" content="Uoo Boot Manager – GRUB, BCD &amp; UEFI boot manager">
+  <meta property="og:description" content="Free, open-source boot manager for Windows 11 and Ubuntu. Choose what starts next, review changes, and keep a recovery path.">
   <meta property="og:url" content="https://uoo.lolisoft.eu/">
   <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager Windows desktop in demo mode showing default boot entry, timeout and boot order">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Uoo Boot Manager – GRUB, BCD &amp; UEFI boot manager">
+  <meta name="twitter:description" content="Free, open-source boot manager for Windows 11 and Ubuntu.">
+  <meta name="twitter:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta name="twitter:image:alt" content="The Uoo Boot Manager Windows desktop in demo mode">
   <link rel="canonical" href="https://uoo.lolisoft.eu/">
   <link rel="icon" href="assets/icons/favicon.ico" sizes="any">
   <link rel="icon" href="assets/icons/favicon.svg" type="image/svg+xml">
@@ -17,8 +29,9 @@
   <link rel="mask-icon" href="assets/icons/mask-icon.svg" color="#ee692f">
   <link rel="manifest" href="assets/icons/site.webmanifest">
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://uoo.lolisoft.eu/#website","url":"https://uoo.lolisoft.eu/","name":"Uoo Boot Manager","inLanguage":"en"},{"@type":"SoftwareApplication","@id":"https://uoo.lolisoft.eu/#app","name":"Uoo Boot Manager","description":"Native boot configuration and recovery for Windows 11 and Ubuntu: boot menu, GRUB and BCD options, UEFI boot order, backups and supported bootloader repair.","url":"https://uoo.lolisoft.eu/","applicationCategory":"UtilitiesApplication","operatingSystem":"Windows 11, Ubuntu 24.04 or later","softwareVersion":"2.2.1","license":"https://github.com/jomardyan/uoo-boot-manager/blob/main/LICENSE","downloadUrl":"https://github.com/jomardyan/uoo-boot-manager/releases/latest","installUrl":"https://uoo.lolisoft.eu/#download","screenshot":["https://uoo.lolisoft.eu/assets/windows-preview.png","https://uoo.lolisoft.eu/assets/app-preview.png"],"image":"https://uoo.lolisoft.eu/assets/icons/android-chrome-512x512.png","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Hayk Jomardyan","url":"https://github.com/jomardyan"},"codeRepository":"https://github.com/jomardyan/uoo-boot-manager","sameAs":["https://github.com/jomardyan/uoo-boot-manager"]}]}</script>
   <script src="app.js" defer></script>
-  <title>Uoo Boot Manager — A clear start. Every time.</title>
+  <title>Uoo Boot Manager – GRUB, BCD &amp; UEFI boot manager</title>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -29,7 +42,7 @@
     </a>
     <nav aria-label="Main navigation">
       <a href="#product">Product</a>
-      <a href="https://github.com/jomardyan/uoo-boot-manager#documentation">Documentation</a>
+      <a href="docs/">Docs</a>
       <a class="nav-download" href="#download">Get Uoo <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
@@ -39,7 +52,7 @@
       <div class="hero-copy">
         <a class="release-badge" href="https://github.com/jomardyan/uoo-boot-manager/releases/tag/v2.2.1"><span class="status-dot" aria-hidden="true"></span>Version 2.2.1<span aria-hidden="true">→</span></a>
         <h1 id="hero-title">A clear start.<br><span>Every time.</span></h1>
-        <p class="hero-description">Boot configuration, under control. Bring operating-system choices, firmware settings, and recovery into one native desktop.</p>
+        <p class="hero-description">Uoo is a free, open-source boot manager for Windows 11 and Ubuntu. Choose the default operating system, edit boot menu options, arrange UEFI boot order, and restore from backups, all from one native desktop.</p>
         <div class="hero-actions">
           <a class="button button-primary" href="#download"><svg aria-hidden="true" viewBox="0 0 20 20"><path d="M10 3v10m-4-4 4 4 4-4M4 14v3h12v-3"/></svg>Download Uoo</a>
           <a class="text-link" href="https://github.com/jomardyan/uoo-boot-manager">View on GitHub <span aria-hidden="true">↗</span></a>
@@ -52,8 +65,8 @@
           <button type="button" class="preview-tab selected" data-platform="windows" aria-pressed="true">Windows 11</button>
           <button type="button" class="preview-tab" data-platform="ubuntu" aria-pressed="false">Ubuntu</button>
         </div>
-        <div class="native-preview" id="windows-preview"><img src="assets/windows-preview.png" width="1028" height="721" alt="The native Uoo Windows desktop in demo mode, showing default boot entry, menu timeout, boot order, and administrator controls."></div>
-        <div class="ubuntu-preview" id="ubuntu-preview" hidden><img src="assets/app-preview.png" width="1120" height="740" alt="The Uoo Ubuntu desktop showing its boot menu, default operating-system choice, timeout, and one-time boot controls."></div>
+        <div class="native-preview" id="windows-preview"><img src="assets/windows-preview.png" width="1028" height="721" fetchpriority="high" decoding="async" alt="The native Uoo Windows desktop in demo mode, showing default boot entry, menu timeout, boot order, and administrator controls."></div>
+        <div class="ubuntu-preview" id="ubuntu-preview" hidden><img src="assets/app-preview.png" width="1120" height="740" loading="lazy" decoding="async" alt="The Uoo Ubuntu desktop showing its boot menu, default operating-system choice, timeout, and one-time boot controls."></div>
         <figcaption id="preview-caption">The native Windows desktop, shown in demo mode. Available options depend on your system.</figcaption>
       </figure>
     </section>
@@ -68,6 +81,17 @@
         <article class="feature-card"><span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 8 10 8 10s8-5 8-10V6zM8 12l3 3 5-6"/></svg></span><h3>Keep a recovery path</h3><p>Inspect backups and restore supported settings. System changes use the installed administrator helper and automatic backups.</p></article>
       </div>
       <div class="platform-note"><span class="note-icon" aria-hidden="true">ⓘ</span><p>Each platform uses its native boot tools: <strong>Windows Boot Manager and BCD</strong> on Windows, <strong>GRUB</strong> on Ubuntu, and UEFI where available. Feature and repair support depend on the detected system.</p></div>
+      <aside class="encryption-note" id="encrypted-disks" aria-labelledby="encryption-title"><span class="note-icon" aria-hidden="true">⚠</span><div><h3 id="encryption-title">Encrypted disk? Have your recovery key first.</h3><p>BitLocker is designed to lock a drive when it detects changes to the boot process, and some boot changes can make Windows ask for your <strong>48-digit recovery password</strong> at the next start. Without it, the drive stays locked. Before you change anything:</p><ul><li><strong>Windows:</strong> find your recovery password in your <a class="text-link" href="https://account.microsoft.com/devices/recoverykey">Microsoft account</a>, Microsoft Entra ID or Active Directory, or run <code>manage-bde -protectors -get C:</code> as administrator, and keep a copy on another device. For a planned change, suspend protection until the next restart with <code>Suspend-BitLocker -MountPoint "C:" -RebootCount 1</code>. Uoo does not suspend BitLocker for you.</li><li><strong>Linux:</strong> keep a working LUKS passphrase or recovery key and back up the volume header to storage that is not on the encrypted disk. If a TPM unlocks the disk automatically, keep the fallback passphrase too.</li><li><strong>Dual boot:</strong> avoid changing the Secure Boot state or firmware boot order while BitLocker is active without suspending it first.</li></ul><p><a class="text-link" href="docs/encrypted-disks/">Read the full encrypted-disk guide</a> · <a class="text-link" href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview">Microsoft&rsquo;s BitLocker recovery overview <span aria-hidden="true">↗</span></a></p></div></aside>
+    </section>
+
+    <section class="docs-strip wrap" id="docs" aria-labelledby="docs-title">
+      <div class="section-heading"><div><span class="eyebrow">DOCUMENTATION</span><h2 id="docs-title">Learn Uoo in minutes.</h2></div><p>Short guides for installing, changing boot settings safely, and recovering when something goes wrong.</p></div>
+      <div class="doc-cards">
+        <a class="doc-card" href="docs/getting-started/"><h3>Getting started</h3><p>Install on Ubuntu or Windows 11, try the demo, and make a first change.</p></a>
+        <a class="doc-card" href="docs/windows/"><h3>Windows 11 guide</h3><p>BCD options, UEFI entries, backups, repair, UAC and BitLocker handling.</p></a>
+        <a class="doc-card" href="docs/ubuntu/"><h3>Ubuntu guide</h3><p>GRUB settings, managed entries, firmware, backups and repair limits.</p></a>
+        <a class="doc-card" href="docs/faq/"><h3>FAQ</h3><p>Safety, licensing, supported distributions and unsigned builds.</p></a>
+      </div>
     </section>
 
     <section class="download-section wrap" id="download" aria-labelledby="download-title">
@@ -114,6 +138,6 @@ sudo apt install uoo-boot-manager</code></pre>
     </section>
   </main>
 
-  <footer class="site-footer wrap"><a class="brand footer-brand" href="#"><img src="assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/LICENSE">License</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="#"><img src="assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/LICENSE">License</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
 </body>
 </html>

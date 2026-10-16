@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uoo Boot Manager on Ubuntu: GRUB, UEFI, backups and repair</title>
+  <meta name="description" content="Manage GRUB settings, custom boot entries, UEFI boot order, backups and bootloader repair on Ubuntu 24.04+ with Uoo. Requirements, file locations and limits.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/ubuntu/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="Uoo Boot Manager on Ubuntu: GRUB, UEFI, backups and repair">
+  <meta property="og:description" content="Manage GRUB settings, custom boot entries, UEFI boot order, backups and bootloader repair on Ubuntu 24.04+ with Uoo. Requirements, file locations and limits.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/ubuntu/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"Ubuntu","item":"https://uoo.lolisoft.eu/docs/ubuntu/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/" aria-current="page">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Ubuntu</span></p>
+      <h1 class="doc-title">Uoo on Ubuntu</h1>
+      <p class="doc-lead">A GTK4 and libadwaita desktop for Ubuntu's GRUB and UEFI boot configuration, with an authenticated helper.</p>
+
+      <h2 id="requirements">Requirements</h2>
+      <ul>
+        <li>Ubuntu 24.04 or newer, GTK 4.6+, libadwaita 1.5+, Python 3.10+, and polkit. The Debian package installs these.</li>
+        <li>GRUB controls need an existing GRUB installation with <code>update-grub</code> and <code>grub-script-check</code>.</li>
+        <li>Firmware controls need UEFI boot mode and <code>efibootmgr</code>.</li>
+        <li>UEFI reinstallation needs Ubuntu's signed shim and GRUB packages; BIOS reinstallation needs <code>grub-pc-bin</code>.</li>
+      </ul>
+
+      <h2 id="what-it-manages">What Uoo manages on Ubuntu</h2>
+      <table>
+        <thead><tr><th>Area</th><th>What you can do</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Boot menu</th><td>GRUB default or saved selection, timeout, visibility, one-time boot.</td></tr>
+          <tr><th scope="row">Entries</th><td>Managed Linux and EFI chainloader entries; enable, disable, reorder, and remove them.</td></tr>
+          <tr><th scope="row">Boot options</th><td>Kernel arguments, recovery entries, OS discovery.</td></tr>
+          <tr><th scope="row">UEFI firmware</th><td>Boot order, inclusion, activation, next boot, local EFI registrations.</td></tr>
+          <tr><th scope="row">Appearance</th><td>GRUB graphics mode, colors, and a validated PNG background.</td></tr>
+          <tr><th scope="row">Backups</th><td>Configuration snapshots, restore, and portable import and export.</td></tr>
+          <tr><th scope="row">Diagnostics and repair</th><td>Supported Ubuntu UEFI and BIOS bootloader repair.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="where-things-live">Where Uoo stores things</h2>
+      <ul>
+        <li>GRUB settings: <code>/etc/default/grub.d/zz-uoo.cfg</code>. Other GRUB settings are preserved.</li>
+        <li>Managed entries: <code>/etc/grub.d/41_uoo</code>.</li>
+        <li>Backups: <code>/var/lib/uoo-boot-manager/backups</code> (private).</li>
+      </ul>
+      <p>Changes are serialized, journaled, verified, and rolled back if a tool fails. An unfinished transaction recovers before the next change. Direct editing of GRUB scripts is not exposed.</p>
+
+      <h2 id="limits">Limits</h2>
+      <ul>
+        <li>Ubuntu is the verified GRUB backend. Other distributions get the desktop, demo, and available inspection, but GRUB changes and repair are not established there.</li>
+        <li>Saved and one-time GRUB selection need a verified writable environment block. Unsupported RAID, LVM, encrypted, or checksumming boot layouts disable them; a separately mounted plain <code>/boot</code> can support them.</li>
+        <li>Bootloader repair currently supports verified x86-64 Ubuntu plain-disk layouts. Review the detected target and type it to confirm.</li>
+        <li>Backups cannot recover a failed disk or guarantee recovery from power loss before the app can run again.</li>
+        <li>AppImage, Flatpak, and Snap need the matching native host package for authenticated system operations.</li>
+        <li>The currently booted entry is protected, and at least one active firmware entry must stay in the boot order.</li>
+      </ul>
+      <p>Full details: <a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/README.md#working-with-boot-settings">README on GitHub</a> and <a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/docs/PACKAGING.md">Linux packaging</a>.</p>
+      <aside class="encryption-note"><span class="note-icon" aria-hidden="true">⚠</span><div><h3>Encrypted disk? Have your recovery key first.</h3><p>Before changing boot settings on a BitLocker or LUKS system, find your recovery password or passphrase and keep a copy on another device. <a href="/docs/encrypted-disks/">Read the encrypted-disk guide</a>.</p></div></aside>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

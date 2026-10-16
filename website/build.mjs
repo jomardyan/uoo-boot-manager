@@ -72,8 +72,8 @@ if (existsSync(path.join(app, 'assets/icons/uoo.svg'))) {
 }
 const stage = await mkdtemp(path.join(tmpdir(), 'uoo-website-'));
 try {
-  for (const file of ['index.html','styles.css','app.js','robots.txt','sitemap.xml']) await cp(path.join(root, file), path.join(stage, file));
-  await cp(path.join(root, 'assets'), path.join(stage, 'assets'), { recursive: true });
+  for (const file of ['index.html','404.html','styles.css','app.js','robots.txt','sitemap.xml']) await cp(path.join(root, file), path.join(stage, file));
+  for (const folder of ['assets', 'docs']) await cp(path.join(root, folder), path.join(stage, folder), { recursive: true });
   const html = await readFile(path.join(stage, 'index.html'), 'utf8');
   if (!html.includes('https://uoo.lolisoft.eu/')) throw new Error('Expected production canonical domain');
   await writeFile(path.join(stage, '.nojekyll'), '');

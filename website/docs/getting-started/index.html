@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting started with Uoo Boot Manager</title>
+  <meta name="description" content="Install Uoo Boot Manager on Ubuntu (PPA or .deb) or Windows 11, try the demo mode, and apply your first boot change safely with backups and rollback.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/getting-started/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="Getting started with Uoo Boot Manager">
+  <meta property="og:description" content="Install Uoo Boot Manager on Ubuntu (PPA or .deb) or Windows 11, try the demo mode, and apply your first boot change safely with backups and rollback.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/getting-started/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"Getting started","item":"https://uoo.lolisoft.eu/docs/getting-started/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/" aria-current="page">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Getting started</span></p>
+      <h1 class="doc-title">Getting started</h1>
+      <p class="doc-lead">Install Uoo, try it in demo mode, and apply a first boot change with a recovery path.</p>
+
+      <h2 id="install-ubuntu">Install on Ubuntu</h2>
+      <p>Ubuntu 24.04 or newer with GTK 4.6+ and libadwaita 1.5+ is required. The package installs Python, PyGObject, GTK4, libadwaita, and polkit.</p>
+      <p>Use the PPA for updates through APT. First confirm that Launchpad has published a successful build for your Ubuntu codename (<code>lsb_release -cs</code>), then run:</p>
+      <pre><code>sudo add-apt-repository ppa:mastercrypt/uoo
+sudo apt update
+sudo apt install uoo-boot-manager</code></pre>
+      <p>If the build for your release is still queued, download <code>uoo-boot-manager_2.2.1_all.deb</code> from the <a href="https://github.com/jomardyan/uoo-boot-manager/releases/latest">latest release</a> and run <code>sudo apt install ./uoo-boot-manager_2.2.1_all.deb</code>. Start it from the application menu or with <code>uoo-boot-manager</code>. Installing never changes boot settings.</p>
+
+      <h2 id="install-windows">Install on Windows 11</h2>
+      <p>Download <strong>windows-x64-setup.exe</strong> (Intel or AMD) or <strong>windows-arm64-setup.exe</strong> (Windows on Arm) from the <a href="https://github.com/jomardyan/uoo-boot-manager/releases/latest">latest release</a>, run the installer, and open <strong>Uoo Boot Manager</strong> from Start. Windows 11 build 22000 or later is required and the .NET runtime is included. Current Windows packages are unsigned, so SmartScreen may warn you; verify the download against the published <code>SHA256SUMS-Windows</code> file.</p>
+      <p>A WinGet listing is being prepared and is not yet in the community catalog.</p>
+
+      <h2 id="demo">Try the demo first</h2>
+      <p>Demo mode uses sample boot entries and changes nothing on your computer.</p>
+      <pre><code># Ubuntu (installed package)
+uoo-boot-manager --demo
+
+# Windows (PowerShell)
+&amp; 'C:\Program Files\Uoo Boot Manager\Uoo.BootManager.exe' --demo</code></pre>
+
+      <h2 id="first-change">Making your first change</h2>
+      <ol>
+        <li><strong>Check for encryption.</strong> If the system drive uses BitLocker or LUKS, follow the <a href="/docs/encrypted-disks/">encrypted-disk guide</a> first.</li>
+        <li><strong>Unlock protected settings.</strong> On Ubuntu, use the lock button and authenticate. On Windows, approve the UAC prompt when an operation needs administrator rights.</li>
+        <li><strong>Edit a draft.</strong> Forms, custom entries, and firmware order stay drafts until you apply them; Uoo asks before discarding them.</li>
+        <li><strong>Apply and review.</strong> Each change is validated, backed up, applied, and verified. If a tool fails, Uoo rolls back.</li>
+        <li><strong>Restart yourself.</strong> Uoo never reboots automatically.</li>
+      </ol>
+      <p>Backups appear on the <strong>Backups</strong> page, where you can inspect, export, and restore them.</p>
+      <aside class="encryption-note"><span class="note-icon" aria-hidden="true">⚠</span><div><h3>Encrypted disk? Have your recovery key first.</h3><p>Before changing boot settings on a BitLocker or LUKS system, find your recovery password or passphrase and keep a copy on another device. <a href="/docs/encrypted-disks/">Read the encrypted-disk guide</a>.</p></div></aside>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

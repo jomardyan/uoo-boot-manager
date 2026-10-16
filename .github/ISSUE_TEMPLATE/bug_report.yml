@@ -1,0 +1,67 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste BitLocker recovery passwords, LUKS passphrases, or tokens.**
+        If a boot change left your PC unable to start, first restore access
+        with your recovery key. See the encrypted-disk warning in the README.
+  - type: input
+    id: version
+    attributes:
+      label: Uoo version
+      placeholder: "2.2.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform and package
+      options:
+        - Ubuntu .deb / PPA
+        - Ubuntu Snap
+        - Flatpak
+        - AppImage
+        - Fedora / openSUSE RPM
+        - Arch package
+        - Windows 11 installer
+        - Windows 11 ZIP
+        - From source
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and version
+      placeholder: "Ubuntu 24.04, Windows 11 24H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: boot
+    attributes:
+      label: Boot mode
+      options: [UEFI, UEFI with Secure Boot, Legacy BIOS, Not sure]
+  - type: dropdown
+    id: encryption
+    attributes:
+      label: Disk encryption on the system drive
+      options: [None, BitLocker, LUKS, Other, Not sure]
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options: [Demo mode, Live (read-only inspection), Installed helper (applying changes)]
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the steps, and exact error text if any.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove personal data such as serial numbers, keys, and hostnames if you want them private.

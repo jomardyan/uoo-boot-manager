@@ -1,2 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://uoo.lolisoft.eu/</loc></url></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://uoo.lolisoft.eu/</loc><lastmod>2026-10-16</lastmod><priority>1.0</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/getting-started/</loc><lastmod>2026-10-16</lastmod><priority>0.8</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/windows/</loc><lastmod>2026-10-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/ubuntu/</loc><lastmod>2026-10-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/encrypted-disks/</loc><lastmod>2026-10-16</lastmod><priority>0.7</priority></url>
+  <url><loc>https://uoo.lolisoft.eu/docs/faq/</loc><lastmod>2026-10-16</lastmod><priority>0.6</priority></url>
+</urlset>

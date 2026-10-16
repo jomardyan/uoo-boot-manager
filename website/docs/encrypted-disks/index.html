@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BitLocker and encrypted disks: back up recovery keys before boot changes</title>
+  <meta name="description" content="Before changing boot settings on a BitLocker or LUKS system, find your recovery key. How to suspend BitLocker, back up a LUKS header, and avoid dual-boot lockouts.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/encrypted-disks/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="BitLocker and encrypted disks: back up recovery keys before boot changes">
+  <meta property="og:description" content="Before changing boot settings on a BitLocker or LUKS system, find your recovery key. How to suspend BitLocker, back up a LUKS header, and avoid dual-boot lockouts.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/encrypted-disks/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"Encrypted disks","item":"https://uoo.lolisoft.eu/docs/encrypted-disks/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/" aria-current="page">Encrypted disks</a></li><li><a href="/docs/faq/">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>Encrypted disks</span></p>
+      <h1 class="doc-title">BitLocker and encrypted disks</h1>
+      <p class="doc-lead">Have your recovery key before changing boot settings on an encrypted system.</p>
+
+      <p>Disk encryption is designed to refuse to unlock a drive when it cannot trust the boot process. Some boot changes therefore make Windows ask for a recovery password or leave a Linux volume waiting for a passphrase. Without that secret your data stays locked. Prepare it <strong>before</strong> you change anything.</p>
+
+      <h2 id="windows">Windows: BitLocker</h2>
+      <p>Microsoft lists, among the causes of BitLocker recovery, changes to the boot manager, turning off or clearing the TPM, firmware or Secure Boot updates, changes that alter the TPM's platform measurements, and (on TPM 1.2 devices) changing the firmware boot order. On UEFI systems with Secure Boot, BitLocker can correct some boot configuration (BCD) settings without a recovery event, so not every edit triggers a prompt. You cannot rely on that for a given change.</p>
+      <h3 id="find-key">1. Find your recovery password</h3>
+      <ul>
+        <li>Personal devices: sign in at <a href="https://account.microsoft.com/devices/recoverykey">account.microsoft.com/devices/recoverykey</a>.</li>
+        <li>Work or school devices: your organization stores it in Microsoft Entra ID or Active Directory; ask your administrator.</li>
+        <li>On the PC, in an administrator terminal: <code>manage-bde -protectors -get C:</code> lists the numerical password. A printout or a saved text file also works.</li>
+      </ul>
+      <p>The password has 48 digits. Keep a copy on a different device, not on the encrypted drive.</p>
+      <h3 id="suspend">2. For a planned change, suspend protection</h3>
+      <pre><code>Suspend-BitLocker -MountPoint "C:" -RebootCount 1</code></pre>
+      <p>Suspending leaves the drive encrypted. Protection resumes after the restart count you set (here, one restart), and resuming reseals the key without asking for the recovery password. Make your boot change, restart once, then confirm with <code>manage-bde -status C:</code>. Uoo does not suspend BitLocker for you.</p>
+      <h3 id="if-prompted">3. If Windows asks for the key anyway</h3>
+      <p>Enter the 48-digit password. Once Windows starts, you can suspend and resume protection to reseal the key for the new configuration.</p>
+
+      <h2 id="linux">Linux: LUKS</h2>
+      <ul>
+        <li>Make sure you know a working passphrase or have a recovery key. If a TPM unlocks the disk automatically, keep the fallback passphrase too.</li>
+        <li>Back up the volume header to storage that is <em>not</em> on the encrypted disk: <code>sudo cryptsetup luksHeaderBackup /dev/&lt;partition&gt; --header-backup-file &lt;file&gt;</code>. Protect that file like a key; it is not a way to recover a forgotten passphrase.</li>
+        <li>Uoo disables some GRUB features (such as saved selection) on encrypted boot layouts it cannot verify, and explains why.</li>
+      </ul>
+
+      <h2 id="dual-boot">Dual boot</h2>
+      <p>Avoid changing the Secure Boot state or the firmware boot order while BitLocker is active unless you suspend it first. Reports from dual-boot users show that a changed boot chain can also prompt for the key on some systems; this is community experience, not a guarantee in either direction.</p>
+
+      <h2 id="sources">Sources</h2>
+      <ul>
+        <li><a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview">BitLocker recovery overview (Microsoft Learn)</a></li>
+        <li><a href="https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/bcd-settings-and-bitlocker">BCD settings and BitLocker (Microsoft Learn)</a></li>
+        <li><a href="https://www.mankier.com/8/cryptsetup-luksHeaderBackup">cryptsetup luksHeaderBackup manual</a></li>
+      </ul>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

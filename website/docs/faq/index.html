@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uoo Boot Manager FAQ: safety, licensing and supported systems</title>
+  <meta name="description" content="Answers about Uoo Boot Manager: is it free, will it reboot, is it safe, supported Linux distributions, unsigned Windows builds, backups and reporting problems.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#f4f6fb">
+  <link rel="canonical" href="https://uoo.lolisoft.eu/docs/faq/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Uoo Boot Manager">
+  <meta property="og:title" content="Uoo Boot Manager FAQ: safety, licensing and supported systems">
+  <meta property="og:description" content="Answers about Uoo Boot Manager: is it free, will it reboot, is it safe, supported Linux distributions, unsigned Windows builds, backups and reporting problems.">
+  <meta property="og:url" content="https://uoo.lolisoft.eu/docs/faq/">
+  <meta property="og:image" content="https://uoo.lolisoft.eu/assets/windows-preview.png">
+  <meta property="og:image:width" content="1028">
+  <meta property="og:image:height" content="721">
+  <meta property="og:image:alt" content="The Uoo Boot Manager desktop in demo mode">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+  <link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/assets/icons/site.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://uoo.lolisoft.eu/"},{"@type":"ListItem","position":2,"name":"Docs","item":"https://uoo.lolisoft.eu/docs/"},{"@type":"ListItem","position":3,"name":"FAQ","item":"https://uoo.lolisoft.eu/docs/faq/"}]}</script>
+</head>
+<body class="doc-body">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="Uoo Boot Manager home">
+      <img src="/assets/icons/uoo.svg" alt="" width="40" height="40">
+      <span>Uoo<span class="brand-caption">Boot Manager</span></span>
+    </a>
+    <nav aria-label="Main navigation">
+      <a href="/#product">Product</a>
+      <a href="/docs/" aria-current="page">Docs</a>
+      <a class="nav-download" href="/#download">Get Uoo <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap doc-layout">
+    <nav class="doc-nav" aria-label="Documentation"><a class="doc-nav-home" href="/docs/">All guides</a><ul><li><a href="/docs/getting-started/">Getting started</a></li><li><a href="/docs/windows/">Windows 11</a></li><li><a href="/docs/ubuntu/">Ubuntu</a></li><li><a href="/docs/encrypted-disks/">Encrypted disks</a></li><li><a href="/docs/faq/" aria-current="page">FAQ</a></li></ul></nav>
+    <article class="doc-content">
+      <p class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a> <span aria-hidden="true">/</span> <a href="/docs/">Docs</a> <span aria-hidden="true">/</span> <span>FAQ</span></p>
+      <h1 class="doc-title">Frequently asked questions</h1>
+      <p class="doc-lead">Short answers about safety, licensing, supported systems, and where Uoo keeps its data.</p>
+
+      <h2 id="free">Is Uoo free?</h2>
+      <p>Yes. Uoo is open source under the <a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/LICENSE">MIT License</a>. You can use, modify, and redistribute it.</p>
+
+      <h2 id="reboot">Will Uoo restart my computer?</h2>
+      <p>No. Uoo never reboots automatically. Scheduled one-time boots take effect the next time you restart.</p>
+
+      <h2 id="safe">Can a change leave my computer unable to start?</h2>
+      <p>Any boot change carries risk. Uoo validates requests, backs up first, verifies the result, and rolls back when a tool fails. It cannot recover a failed disk or guarantee recovery from power loss in the middle of a change, so keep recovery media and, on encrypted systems, your <a href="/docs/encrypted-disks/">recovery key</a>.</p>
+
+      <h2 id="distros">Which Linux distributions are supported?</h2>
+      <p>Ubuntu 24.04+ is the verified GRUB backend. Fedora, openSUSE, and Arch packages provide the desktop, demo, and available inspection, but GRUB changes and repair are not established there. See <a href="/docs/ubuntu/">Uoo on Ubuntu</a>.</p>
+
+      <h2 id="cross-os">Can the Windows app edit Linux's GRUB, or the Linux app edit Windows?</h2>
+      <p>No. Each edition manages its own platform's boot tools: Windows Boot Manager and BCD on Windows, GRUB and UEFI on Ubuntu. To start Linux from Windows Boot Manager, register an existing Linux EFI loader as a local firmware entry.</p>
+
+      <h2 id="snap-flatpak">Why do the Snap, Flatpak, and AppImage builds not change my system?</h2>
+      <p>They provide the desktop and demo. Authenticated system changes need the matching native package, which installs the root-owned helper and polkit policy.</p>
+
+      <h2 id="unsigned">Why does Windows warn about the installer?</h2>
+      <p>Current Windows packages are not code-signed, so SmartScreen shows an unknown-publisher warning. Download from the official GitHub release and check the SHA256 manifest. Code signing is being evaluated.</p>
+
+      <h2 id="backups">Where are backups stored?</h2>
+      <p>On Ubuntu in <code>/var/lib/uoo-boot-manager/backups</code>; on Windows under <code>%ProgramData%\Uoo\BootManager</code>. Both are private to administrators, and removing the app does not delete them on Windows.</p>
+
+      <h2 id="winget">Is Uoo on WinGet?</h2>
+      <p>Not yet. A listing is in preparation; use the installer from the release page for now.</p>
+
+      <h2 id="report">How do I report a bug or a security problem?</h2>
+      <p>Open a <a href="https://github.com/jomardyan/uoo-boot-manager/issues">GitHub issue</a> for bugs; include your version, platform, and boot mode, and never paste recovery keys. Report vulnerabilities privately as described in the <a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">security policy</a>.</p>
+    </article>
+  </main>
+
+  <footer class="site-footer wrap"><a class="brand footer-brand" href="/"><img src="/assets/icons/uoo.svg" alt="" width="28" height="28"><span>Uoo Boot Manager</span></a><p>Built by <a href="https://github.com/jomardyan">Hayk Jomardyan</a> · MIT licensed</p><div><a href="/docs/">Docs</a><a href="https://github.com/jomardyan/uoo-boot-manager/issues">Support</a><a href="https://github.com/jomardyan/uoo-boot-manager/blob/main/SECURITY.md">Security</a><a href="https://github.com/jomardyan/uoo-boot-manager">GitHub <span aria-hidden="true">↗</span></a></div></footer>
+</body>
+</html>

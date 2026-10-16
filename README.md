@@ -58,7 +58,7 @@ repositories, the Snap Store, Flathub, or the AUR.
 
 ## Screenshots
 
-The Ubuntu edition in demo mode. Click an image to view it at full size.
+Demo-mode screenshots of the Ubuntu and Windows editions. Click an image to view it at full size.
 
 **Boot menu — light appearance**
 
@@ -74,6 +74,10 @@ The Ubuntu edition in demo mode. Click an image to view it at full size.
 [![UEFI firmware page in a compact Ubuntu application window](docs/images/firmware-small.png)](docs/images/firmware-small.png)
 
 </details>
+
+**Windows 11 edition in demo mode**
+
+[![Windows boot page showing the default entry, timeout, and boot order](docs/images/windows-boot.png)](docs/images/windows-boot.png)
 
 ## Features
 
@@ -173,6 +177,36 @@ administrator authentication. Each system change requires authentication.
 Forms, custom entries, and firmware order remain drafts until applied; closing
 or reloading prompts before discarding them. Windows system operations use the
 installed helper through UAC.
+
+> [!WARNING]
+> **Encrypted disk? Have your recovery key before you change anything.**
+> BitLocker, and TPM-based unlocking in general, is designed to refuse to unlock
+> a drive when it detects that the boot process changed. Some boot changes can
+> therefore make Windows ask for the **48-digit BitLocker recovery password** at
+> the next start. Without it, the drive stays locked.
+>
+> - **Windows (BitLocker):** Microsoft lists changes to the boot manager, the
+>   boot configuration (BCD), the TPM, firmware or Secure Boot state, and, on
+>   TPM 1.2 devices, the firmware boot order among the causes of recovery. Not
+>   every edit triggers it, but you cannot rely on that. Find your recovery
+>   password first (your [Microsoft account](https://account.microsoft.com/devices/recoverykey),
+>   Microsoft Entra ID or Active Directory, a printout, or
+>   `manage-bde -protectors -get C:` in an administrator terminal) and keep a copy
+>   on another device. For a planned change you can suspend protection until
+>   the next restart with `Suspend-BitLocker -MountPoint "C:" -RebootCount 1`;
+>   resuming reseals the key without asking for the recovery password.
+>   Uoo does not suspend BitLocker for you.
+> - **Linux (LUKS):** keep a working passphrase or recovery key, and back up the
+>   volume header to storage that is not on the encrypted disk
+>   (`cryptsetup luksHeaderBackup /dev/<partition> --header-backup-file <file>`).
+>   If the disk unlocks automatically through a TPM, keep the fallback
+>   passphrase as well.
+> - **Dual boot:** do not change the Secure Boot state or firmware boot order
+>   while BitLocker is active without suspending protection first. A changed
+>   boot chain can also prompt for the key on some systems.
+>
+> Details: [Microsoft's BitLocker recovery overview](https://learn.microsoft.com/en-us/windows/security/operating-system-security/data-protection/bitlocker/recovery-overview)
+> and [Windows BitLocker handling in Uoo](docs/WINDOWS.md).
 
 <details>
 <summary>Ubuntu configuration, supported operations, and repair limits</summary>
@@ -305,13 +339,19 @@ uploading to your own hosting.
 | [WinGet publishing](docs/WINGET.md) | Prepare, test, and submit the Windows package manifests |
 | [Production requirements](docs/PRODUCTION.md) | Supported operations and verification gates |
 | [Validation report](docs/VALIDATION.md) | Recorded test evidence and remaining limits |
+| [Automated publishing](docs/PUBLISH-AUTOMATION.md) | Manual GitHub Actions workflow for the PPA, Snap Store, WinGet, and AUR |
+| [Windows code signing](docs/CODE-SIGNING.md) | Signing options and plan for removing SmartScreen warnings |
+| [Security policy](SECURITY.md) | Private vulnerability reporting and scope |
+| [Contributing](CONTRIBUTING.md) | Development setup, safety rules, and pull request checks |
 
 Implementation references: [GNU GRUB configuration](https://www.gnu.org/software/grub/manual/grub/html_node/Simple-configuration.html)
 and [Ubuntu efibootmgr manual](https://manpages.ubuntu.com/manpages/noble/man8/efibootmgr.8.html).
 
 ## Contributing and support
 
-Report bugs or propose improvements through [GitHub Issues](https://github.com/jomardyan/uoo-boot-manager/issues).
+Report bugs or propose improvements through [GitHub Issues](https://github.com/jomardyan/uoo-boot-manager/issues);
+report security problems privately as described in [SECURITY.md](SECURITY.md), and
+read [CONTRIBUTING.md](CONTRIBUTING.md) before sending code.
 Include your OS version, package format, CPU architecture, boot mode, steps to
 reproduce, and relevant diagnostics with personal data removed. For code
 changes, run the checks appropriate to the platform and describe the validation

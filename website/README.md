@@ -4,7 +4,11 @@ A static Fluent-inspired product page for `https://uoo.lolisoft.eu/`. It has no
 server, package-manager dependencies, external fonts, analytics, or cookies.
 Both platform panels show real demo screenshots. The Windows capture comes
 from the successful x64 native-desktop job in GitHub Actions run 38809943611;
-the Ubuntu capture comes from the local native GTK demo. Download links point to the 2.2.1 GitHub release assets.
+the Ubuntu capture comes from the local native GTK demo. The download picker
+links to all 14 package assets from the 2.2.1 GitHub release: Windows x64/ARM64
+installers and portable ZIPs, Debian, Fedora/openSUSE RPMs, Arch, and x64/ARM64
+AppImage, Flatpak, and Snap builds. Each selection includes its installation
+guide and the matching Linux or Windows SHA256 manifest.
 
 Build and preview from the application repository root:
 

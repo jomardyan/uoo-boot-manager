@@ -399,3 +399,8 @@ credit in the application UI. Third-party components retain their own licenses.
 ## WinGet verification note
 
 The manual WinGet workflow generates manifests from the current stable release only after checking both published installer sizes and SHA-256 digests. It validates native x64 and ARM64 installs and uninstalls with a checksum-pinned Microsoft client, and retains diagnostic artifacts. The x64 Windows Server 2025 runner currently reproduces a launch stall matching [Microsoft WinGet issue 6506](https://github.com/microsoft/winget-cli/issues/6506): download/hash validation completes, but no installer process starts. The same verified installer installs and uninstalls directly; the ARM64 WinGet check passes. The x64 check remains failed after a bounded timeout. A direct control test does not convert that failure into success. Code signing/reputation and a Microsoft client fix have not been established as resolutions; no release asset or system security policy is changed by this audit.
+
+## Copyright
+
+Copyright (c) 2026 Hayk Jomardyan - Lolisoft.
+See COPYRIGHT.md for attribution and existing license notices.

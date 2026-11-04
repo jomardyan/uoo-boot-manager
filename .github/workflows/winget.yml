@@ -87,7 +87,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not enable local manifests.' }
           $output = Join-Path $env:RUNNER_TEMP 'winget-install.stdout.log'
           $errors = Join-Path $env:RUNNER_TEMP 'winget-install.stderr.log'
-          $install = Start-Process -FilePath $env:UOO_WINGET -WindowStyle Hidden -PassThru -RedirectStandardOutput $output -RedirectStandardError $errors -ArgumentList @('install','--manifest',$manifest,'--architecture','${{ matrix.arch }}','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
+          $install = Start-Process -FilePath $env:UOO_WINGET -WindowStyle Hidden -PassThru -RedirectStandardOutput $output -RedirectStandardError $errors -ArgumentList @('install','--manifest',$manifest,'--architecture','${{ matrix.arch }}','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity','--no-progress')
           try {
             $deadline = (Get-Date).AddMinutes(6)
             while (!$install.WaitForExit(30000)) {

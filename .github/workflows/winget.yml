@@ -76,7 +76,7 @@ jobs:
           New-Item -ItemType Directory -Path $settings -Force | Out-Null
           '{"network":{"downloader":"wininet"}}' | Set-Content (Join-Path $settings 'settings.json') -Encoding utf8
       - name: Validate and install the published native installer
-        timeout-minutes: 2
+        timeout-minutes: 8
         run: |
           $ErrorActionPreference = 'Stop'
           $version = ([xml](Get-Content windows/Directory.Build.props -Raw)).Project.PropertyGroup.Version
@@ -85,8 +85,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest validation failed.' }
           & $env:UOO_WINGET settings --enable LocalManifestFiles
           if ($LASTEXITCODE -ne 0) { throw 'Could not enable local manifests.' }
-          & $env:UOO_WINGET install --manifest $manifest --architecture '${{ matrix.arch }}' --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
-          if ($LASTEXITCODE -ne 0) { throw 'WinGet installation failed.' }
+          $output = Join-Path $env:RUNNER_TEMP 'winget-install.stdout.log'
+          $errors = Join-Path $env:RUNNER_TEMP 'winget-install.stderr.log'
+          $install = Start-Process -FilePath $env:UOO_WINGET -WindowStyle Hidden -PassThru -RedirectStandardOutput $output -RedirectStandardError $errors -ArgumentList @('install','--manifest',$manifest,'--architecture','${{ matrix.arch }}','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
+          try {
+            $deadline = (Get-Date).AddMinutes(6)
+            while (!$install.WaitForExit(30000)) {
+              Write-Host 'Waiting for verified installer; current installer processes:'
+              Get-CimInstance Win32_Process | Where-Object { $_.Name -like '*Uoo*' -or $_.Name -like 'is-*.tmp' -or $_.ProcessId -eq $install.Id } | Select-Object ProcessId,ParentProcessId,Name,KernelModeTime,UserModeTime,ReadOperationCount,WriteOperationCount | Format-Table
+              $installLog = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'
+              Get-ChildItem $installLog -Filter 'HaykJomardyan*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content $_.FullName -Tail 8 }
+              if ((Get-Date) -ge $deadline) { $install.Kill($true); throw 'WinGet installer did not exit within six minutes.' }
+            }
+            $install.WaitForExit()
+            if ($install.ExitCode -ne 0) { throw "WinGet installation failed ($($install.ExitCode))." }
+          } finally {
+            if (Test-Path $output) { Get-Content $output -Tail 80 }
+            if (Test-Path $errors) { Get-Content $errors -Tail 40 }
+          }
           $registration = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{1179B417-6013-4CFA-92E3-41C9F5FC07F5}_is1'
           if ($registration.DisplayVersion -ne $version) { throw 'Installed version differs from the manifest.' }
           if ($registration.DisplayName -ne "Uoo Boot Manager $version") { throw "Unexpected installed display name: $($registration.DisplayName)" }
@@ -124,12 +140,13 @@ jobs:
           if (!$manifest.Contains($hash)) { throw 'The downloaded control installer does not match the prepared manifest.' }
           Get-CimInstance Win32_Process | Where-Object { $_.Name -like '*Uoo*' -or $_.Name -like '*setup*' } | Select-Object Name, ProcessId, ParentProcessId, CommandLine | Format-List
           $log = Join-Path $env:RUNNER_TEMP 'uoo-direct-setup.log'
-          $setup = Start-Process $installer -ArgumentList @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$log`"") -Wait -PassThru
+          Unblock-File -LiteralPath $installer
+          $setup = Start-Process $installer -WindowStyle Hidden -ArgumentList @('/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/LOG=`"$log`"") -Wait -PassThru
           if (Test-Path $log) { Get-Content $log -Tail 40 }
           if ($setup.ExitCode -ne 0) { throw "Direct installation failed: $($setup.ExitCode)" }
           $uninstaller = Join-Path $env:ProgramFiles 'Uoo Boot Manager\unins000.exe'
           if (!(Test-Path $uninstaller)) { throw 'Direct installation did not produce an uninstaller.' }
-          $removed = Start-Process $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          $removed = Start-Process $uninstaller -WindowStyle Hidden -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($removed.ExitCode -ne 0) { throw "Direct uninstall failed: $($removed.ExitCode)" }
           Write-Host 'The same verified x64 installer installs and uninstalls directly; the WinGet launch check remains failed.'
       - name: Disable local manifest support

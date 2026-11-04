@@ -89,14 +89,14 @@ jobs:
           $errors = Join-Path $env:RUNNER_TEMP 'winget-install.stderr.log'
           $install = Start-Process -FilePath $env:UOO_WINGET -WindowStyle Hidden -PassThru -RedirectStandardOutput $output -RedirectStandardError $errors -ArgumentList @('install','--manifest',$manifest,'--architecture','${{ matrix.arch }}','--silent','--accept-package-agreements','--accept-source-agreements','--disable-interactivity')
           try {
-            $deadline = (Get-Date).AddMinutes(6)
+            $deadline = (Get-Date).AddMinutes(2)
             while (!$install.WaitForExit(30000)) {
               & ./scripts/ci-winget-windows.ps1 -ProcessId $install.Id
               Write-Host 'Waiting for verified installer; current installer processes:'
               Get-CimInstance Win32_Process | Where-Object { $_.Name -like '*Uoo*' -or $_.Name -like 'is-*.tmp' -or $_.ProcessId -eq $install.Id } | Select-Object ProcessId,ParentProcessId,Name,KernelModeTime,UserModeTime,ReadOperationCount,WriteOperationCount | Format-Table
               $installLog = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'
               Get-ChildItem $installLog -Filter 'HaykJomardyan*.log' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content $_.FullName -Tail 8 }
-              if ((Get-Date) -ge $deadline) { $install.Kill($true); throw 'WinGet installer did not exit within six minutes.' }
+              if ((Get-Date) -ge $deadline) { $install.Kill($true); throw 'WinGet installer did not exit within two minutes.' }
             }
             $install.WaitForExit()
             if ($install.ExitCode -ne 0) { throw "WinGet installation failed ($($install.ExitCode))." }

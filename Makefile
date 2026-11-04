@@ -219,3 +219,12 @@ clean:
 distclean: clean
 	$(task_status)
 	$(RM) -r -- dist
+
+# Standard development aliases; native packaging still uses the documented host tools.
+.PHONY: install dev lint package
+install: deps-test
+dev: demo
+lint:
+	"$(PYTHON)" -m compileall -q uoo helper.py scripts tests
+	"$(NODE)" --check website/app.js
+package: packages

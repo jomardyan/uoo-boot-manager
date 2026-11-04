@@ -393,3 +393,5 @@ You may use, modify, and redistribute it, including commercially, provided you
 retain the copyright notice and license permission notice in all copies or
 substantial portions of the software. The license does not require a visible
 credit in the application UI. Third-party components retain their own licenses.
+
+[Maintenance audit and validation notes](docs/AUDIT-2026-11-04.md) documents the reviewed scope, development commands, checks and remaining limits.

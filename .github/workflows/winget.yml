@@ -149,15 +149,31 @@ jobs:
           $removed = Start-Process $uninstaller -WindowStyle Hidden -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($removed.ExitCode -ne 0) { throw "Direct uninstall failed: $($removed.ExitCode)" }
           Write-Host 'The same verified x64 installer installs and uninstalls directly; the WinGet launch check remains failed.'
+      - name: Collect installation and WinGet diagnostics in one artifact directory
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $destination = Join-Path $env:RUNNER_TEMP 'winget-diagnostics'
+          New-Item -ItemType Directory -Path $destination -Force | Out-Null
+          $locations = @(
+            @{ Directory = $env:RUNNER_TEMP; Pattern = 'winget-install.*.log' },
+            @{ Directory = $env:RUNNER_TEMP; Pattern = 'uoo-direct-setup.log' },
+            @{ Directory = (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'); Pattern = '*.log' }
+          )
+          foreach ($location in $locations) {
+            if (Test-Path -LiteralPath $location.Directory) {
+              Get-ChildItem -LiteralPath $location.Directory -Filter $location.Pattern -File | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $destination }
+            }
+          }
+          if (!(Get-ChildItem -LiteralPath $destination -File)) {
+            'No logs were created before the preceding failure.' | Set-Content (Join-Path $destination 'no-installer-logs.txt')
+          }
       - name: Retain installation and WinGet diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: winget-diagnostics-${{ matrix.arch }}
-          path: |
-            ${{ runner.temp }}/winget-install.*.log
-            ${{ runner.temp }}/uoo-direct-setup.log
-            ~/AppData/Local/Packages/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe/LocalState/DiagOutputDir/*.log
+          path: ${{ runner.temp }}/winget-diagnostics
           if-no-files-found: error
       - name: Disable local manifest support
         if: always()

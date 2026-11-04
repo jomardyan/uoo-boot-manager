@@ -91,6 +91,7 @@ jobs:
           try {
             $deadline = (Get-Date).AddMinutes(6)
             while (!$install.WaitForExit(30000)) {
+              & ./scripts/ci-winget-windows.ps1 -ProcessId $install.Id
               Write-Host 'Waiting for verified installer; current installer processes:'
               Get-CimInstance Win32_Process | Where-Object { $_.Name -like '*Uoo*' -or $_.Name -like 'is-*.tmp' -or $_.ProcessId -eq $install.Id } | Select-Object ProcessId,ParentProcessId,Name,KernelModeTime,UserModeTime,ReadOperationCount,WriteOperationCount | Format-Table
               $installLog = Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe\LocalState\DiagOutputDir'

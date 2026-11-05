@@ -3,10 +3,20 @@
 .DELETE_ON_ERROR:
 .ONESHELL:
 
-SHELL := /bin/bash
+# GNU Make needs one shell executable, not "/usr/bin/env bash".
+ifeq ($(OS),Windows_NT)
+BASH ?= $(subst \,/,$(or $(ProgramW6432),$(PROGRAMW6432),$(ProgramFiles),$(PROGRAMFILES)))/Git/bin/bash.exe
+else
+BASH ?= bash
+endif
+SHELL := $(BASH)
 .SHELLFLAGS := -eu -o pipefail -c
 
+ifeq ($(OS),Windows_NT)
+PYTHON ?= python
+else
 PYTHON ?= python3
+endif
 DOTNET ?= dotnet
 POWERSHELL ?= pwsh
 NODE ?= node
@@ -196,7 +206,7 @@ demo:
 # refresh and validate it before starting tests (also when using make -j).
 check: check-package
 	$(task_status)
-	$(MAKE) --no-print-directory test
+	"$(MAKE)" --no-print-directory test
 
 windows:
 	$(task_status)
@@ -214,11 +224,11 @@ vm-test: check-package
 
 clean:
 	$(task_status)
-	$(RM) -r -- build
+	"$(PYTHON)" tools/make-support.py clean build
 
 distclean: clean
 	$(task_status)
-	$(RM) -r -- dist
+	"$(PYTHON)" tools/make-support.py clean dist
 
 # Standard development aliases; native packaging still uses the documented host tools.
 .PHONY: install dev lint package
@@ -228,3 +238,6 @@ lint:
 	"$(PYTHON)" -m compileall -q uoo helper.py scripts tests
 	"$(NODE)" --check website/app.js
 package: packages
+
+.PHONY: check-source
+check-source: lint version test ## Run source checks without native Linux packaging or installation
